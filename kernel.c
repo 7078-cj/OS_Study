@@ -1,7 +1,8 @@
+#include "types.h"
 
 void printf(char* str){
 
-    unsigned short* VideoMemory = (unsigned short*)0xb8000;
+    uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
     for(int i = 0; str[i] != '\0'; i++){
         VideoMemory[i] = (VideoMemory[i] & 0xFF00) | str[i];
@@ -21,7 +22,7 @@ void callConstructors(){
     }
 }
 void kernelMain(void* multiboot_structure, unsigned int magic_number){
-    printf("Hello World WOW");
+    printf("Hello World WOW \n");
 
     while(1);
 }
