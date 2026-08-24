@@ -1,4 +1,5 @@
 #include "types.h"
+#include "gdt/gdt.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
@@ -39,6 +40,8 @@ void callConstructors(){
 void kernelMain(void* multiboot_structure, unsigned int magic_number){
     printf("Hello World WOW \n");
     printf("Wrahhhhh \n");
-    
+
+    GlobalDescriptorTable gdt;
+
     while(1);
 }

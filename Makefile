@@ -4,41 +4,55 @@ CFLAGS = -m32 -ffreestanding -fno-pie -fno-stack-protector -fno-builtin
 ASFLAGS = --32
 LDFLAGS = -melf_i386
 
-OBJECTS = build/loader.o build/kernel.o
-
 BUILD_DIR = build
 ISO = $(BUILD_DIR)/myos.iso
 
-# VirtualBox VM name — change this if your VM is named differently
 VM_NAME = MyOS
 
-.PHONY: all install run run_vm clean
+# --------------------------------------------------
+# Object files
+# --------------------------------------------------
+
+OBJECTS = build/loader.o build/kernel.o build/gdt.o
 
 # --------------------------------------------------
-# Default target
+# Targets
 # --------------------------------------------------
+
+.PHONY: all install run run_vm clean
 
 all: $(ISO)
 
 # --------------------------------------------------
-# Ensure build directory exists
+# Build directory
 # --------------------------------------------------
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 # --------------------------------------------------
-# Compile C files
+# Root-level C files
 # --------------------------------------------------
 
-build/%.o: %.c | $(BUILD_DIR)
+build/kernel.o: kernel.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
-# Assemble .s files
+# C files inside their own directory
+#
+# gdt/gdt.c -> build/gdt.o
+# idt/idt.c -> build/idt.o
+# paging/paging.c -> build/paging.o
 # --------------------------------------------------
 
-build/%.o: %.s | $(BUILD_DIR)
+build/gdt.o: gdt/gdt.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# Assembly
+# --------------------------------------------------
+
+build/loader.o: loader.s | $(BUILD_DIR)
 	as $(ASFLAGS) -o $@ $<
 
 # --------------------------------------------------
@@ -49,7 +63,7 @@ build/mykernel.bin: linker.ld $(OBJECTS)
 	ld $(LDFLAGS) -T linker.ld -o $@ $(OBJECTS)
 
 # --------------------------------------------------
-# Copy kernel into ISO directory
+# Install kernel into ISO
 # --------------------------------------------------
 
 install: build/mykernel.bin
@@ -57,26 +71,21 @@ install: build/mykernel.bin
 	cp $< iso/boot/mykernel.bin
 
 # --------------------------------------------------
-# Create bootable ISO using grub-mkrescue
-# (handles grub-mkimage + xorriso internally)
+# Create ISO
 # --------------------------------------------------
 
 $(ISO): install | $(BUILD_DIR)
 	grub-mkrescue -o $(ISO) iso
 
 # --------------------------------------------------
-# Run using QEMU (runs entirely inside WSL)
+# Run QEMU
 # --------------------------------------------------
 
 run: $(ISO)
 	qemu-system-i386 -cdrom $(ISO)
 
 # --------------------------------------------------
-# Run using VirtualBox
-# Builds happen in WSL, but VirtualBox itself runs on
-# Windows, so this calls the Windows VBoxManage.exe via
-# WSL interop and converts the ISO's WSL path to a
-# Windows path automatically.
+# Run VirtualBox
 # --------------------------------------------------
 
 run_vm: $(ISO)
