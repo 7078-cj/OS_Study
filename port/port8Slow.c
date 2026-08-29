@@ -19,15 +19,6 @@ static void Port8BitSlow_Write_impl(Port8BitSlow* self, uint8_t data)
 
 
 /* --------------------------------------------------------------- */
-/* Port8BitSlow VTable                                              */
-/* --------------------------------------------------------------- */
-
-static const Port8BitVTable port8bitSlow_vtable = {
-    .Write   = Port8BitSlow_Write_impl,
-};
-
-
-/* --------------------------------------------------------------- */
 /* Port8BitSlow Initialization                                      */
 /* --------------------------------------------------------------- */
 
@@ -35,9 +26,8 @@ void Port8BitSlow_init(Port8BitSlow* self, uint16_t portnumber)
 {
     Port8Bit_init(&self->base, portnumber);
 
-    self->base.vtable = &port8bitSlow_vtable;
+    self->Write = Port8BitSlow_Write_impl;
 }
-
 
 /* --------------------------------------------------------------- */
 /* Public Destroy                                                   */

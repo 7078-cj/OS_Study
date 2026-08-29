@@ -41,8 +41,11 @@ void Port8Bit_destroy(Port8Bit* self);
 /* Port8BitSlow : public Port8Bit                                      */
 /* ------------------------------------------------------------------ */
 
+typedef struct Port8BitSlow Port8BitSlow;
+
 typedef struct Port8BitSlow {
     Port8Bit base;
+    void (*Write)(Port8BitSlow* self, uint8_t data);
 } Port8BitSlow;
 
 void Port8BitSlow_init(Port8BitSlow* self, uint16_t portnumber);
