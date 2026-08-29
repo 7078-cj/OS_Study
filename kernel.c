@@ -1,28 +1,40 @@
 #include "types.h"
 #include "gdt/gdt.h"
+#include "port/port.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
 uint8_t CursorX = 0;
 uint8_t CursorY = 0;
 
-void printf(char* str){
+void printf(char* str)
+{
+    for (int i = 0; str[i] != '\0'; i++)
+    {
+        switch (str[i])
+        {
+            case '\n':
+                CursorX = 0;
+                CursorY++;
+                break;
 
-    for(int i = 0; str[i] != '\0'; i++){
+            default:
+            {
+                int offset = CursorY * 80 + CursorX;
 
-        if (str[i] == '\n') {
-            CursorX = 0;
-            CursorY++;
-            continue;
-        }
+                VideoMemory[offset] =
+                    (VideoMemory[offset] & 0xFF00) | str[i];
 
-        int offset = CursorY * 80 + CursorX;
-        VideoMemory[offset] = (VideoMemory[offset] & 0xFF00) | str[i];
-        CursorX++;
+                CursorX++;
 
-        if (CursorX >= 80) {
-            CursorX = 0;
-            CursorY++;
+                if (CursorX >= 80)
+                {
+                    CursorX = 0;
+                    CursorY++;
+                }
+
+                break;
+            }
         }
     }
 }

@@ -12,8 +12,7 @@ VM_NAME = MyOS
 # --------------------------------------------------
 # Object files
 # --------------------------------------------------
-
-OBJECTS = build/loader.o build/kernel.o build/gdt.o
+OBJECTS = build/loader.o build/kernel.o build/gdt.o build/port.o
 
 # --------------------------------------------------
 # Targets
@@ -46,6 +45,13 @@ build/kernel.o: kernel.c | $(BUILD_DIR)
 # --------------------------------------------------
 
 build/gdt.o: gdt/gdt.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# Port
+# --------------------------------------------------
+
+build/port.o: port/port.c port/port.h port/port8.c port/port8Slow.c port/port16.c port/port32.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------

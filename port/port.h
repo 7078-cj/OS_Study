@@ -1,83 +1,95 @@
 #ifndef PORT_H
 #define PORT_H
 
-#include "../types.h"   
+#include "../types.h"
+
 
 /* ------------------------------------------------------------------ */
-/* Port : base type (was: class Port)                                  */
-/* No virtual functions of its own, so no vtable needed here.          */
+/* Port : base type                                                    */
 /* ------------------------------------------------------------------ */
+
 typedef struct Port {
     uint16_t portnumber;
 } Port;
 
-void Port_init(Port *self, uint16_t portnumber);
-void Port_deinit(Port *self);
+void Port_init(Port* self, uint16_t portnumber);
+void Port_deinit(Port* self);
+
 
 /* ------------------------------------------------------------------ */
 /* Port8Bit : public Port                                              */
-/* Has virtual Write/Read, so it carries a vtable pointer.             */
 /* ------------------------------------------------------------------ */
+
 typedef struct Port8Bit Port8Bit;
 
 typedef struct Port8BitVTable {
-    void    (*Write)(Port8Bit *self, uint8_t data);
-    uint8_t (*Read)(Port8Bit *self);
-    void    (*Destroy)(Port8Bit *self); /* stands in for ~Port8Bit() */
+    void    (*Write)(Port8Bit* self, uint8_t data);
+    uint8_t (*Read)(Port8Bit* self);
+    void    (*Destroy)(Port8Bit* self);
 } Port8BitVTable;
 
 struct Port8Bit {
-    Port base;                     /* "inherited" members */
-    const Port8BitVTable *vtable;  /* dispatch table */
+    Port base;
+    const Port8BitVTable* vtable;
 };
 
-Port8Bit *Port8Bit_create(uint16_t portnumber);
-void      Port8Bit_destroy(Port8Bit *self);
+void Port8Bit_init(Port8Bit* self, uint16_t portnumber);
+void Port8Bit_destroy(Port8Bit* self);
 
-/* call-through helpers so call sites look like p->Write(data) */
-static inline void Port8Bit_Write(Port8Bit *self, uint8_t data) {
-    self->vtable->Write(self, data);
-}
-static inline uint8_t Port8Bit_Read(Port8Bit *self) {
-    return self->vtable->Read(self);
-}
 
 /* ------------------------------------------------------------------ */
 /* Port8BitSlow : public Port8Bit                                      */
-/* Overrides Write only, so it reuses Port8Bit's Read via the vtable.  */
 /* ------------------------------------------------------------------ */
+
 typedef struct Port8BitSlow {
-    Port8Bit base;  /* "inherited" members, incl. base.vtable */
+    Port8Bit base;
 } Port8BitSlow;
 
-Port8BitSlow *Port8BitSlow_create(uint16_t portnumber);
-void          Port8BitSlow_destroy(Port8BitSlow *self);
+void Port8BitSlow_init(Port8BitSlow* self, uint16_t portnumber);
+void Port8BitSlow_destroy(Port8BitSlow* self);
+
 
 /* ------------------------------------------------------------------ */
 /* Port16Bit : public Port                                             */
-/* Independent virtual Write/Read pair, own vtable type.               */
 /* ------------------------------------------------------------------ */
+
 typedef struct Port16Bit Port16Bit;
 
 typedef struct Port16BitVTable {
-    void     (*Write)(Port16Bit *self, uint16_t data);
-    uint16_t (*Read)(Port16Bit *self);
-    void     (*Destroy)(Port16Bit *self);
+    void     (*Write)(Port16Bit* self, uint16_t data);
+    uint16_t (*Read)(Port16Bit* self);
+    void     (*Destroy)(Port16Bit* self);
 } Port16BitVTable;
 
 struct Port16Bit {
     Port base;
-    const Port16BitVTable *vtable;
+    const Port16BitVTable* vtable;
 };
 
-Port16Bit *Port16Bit_create(uint16_t portnumber);
-void       Port16Bit_destroy(Port16Bit *self);
+void Port16Bit_init(Port16Bit* self, uint16_t portnumber);
+void Port16Bit_destroy(Port16Bit* self);
 
-static inline void Port16Bit_Write(Port16Bit *self, uint16_t data) {
-    self->vtable->Write(self, data);
-}
-static inline uint16_t Port16Bit_Read(Port16Bit *self) {
-    return self->vtable->Read(self);
-}
+/* ------------------------------------------------------------------ */
+/* Port32Bit : public Port                                             */
+/* ------------------------------------------------------------------ */
+
+typedef struct Port32Bit Port32Bit;
+
+typedef struct Port32BitVTable {
+    void     (*Write)(Port32Bit* self, uint32_t data);
+    uint32_t (*Read)(Port32Bit* self);
+    void     (*Destroy)(Port32Bit* self);
+} Port32BitVTable;
+
+struct Port32Bit {
+    Port base;
+    const Port32BitVTable* vtable;
+};
+
+void Port32Bit_init(Port32Bit* self, uint16_t portnumber);
+void Port32Bit_Write(Port32Bit* self, uint32_t data);
+uint32_t Port32Bit_Read(Port32Bit* self);
+void Port32Bit_destroy(Port32Bit* self);
+
 
 #endif /* PORT_H */
