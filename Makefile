@@ -12,7 +12,7 @@ VM_NAME = MyOS
 # --------------------------------------------------
 # Object files
 # --------------------------------------------------
-OBJECTS = build/loader.o build/kernel.o build/gdt.o build/port.o
+OBJECTS = build/loader.o build/kernel.o build/gdt.o build/port.o build/interruptstub.o build/interrupts.o
 
 # --------------------------------------------------
 # Targets
@@ -53,6 +53,17 @@ build/gdt.o: gdt/gdt.c | $(BUILD_DIR)
 
 build/port.o: port/port.c port/port.h port/port8.c port/port8Slow.c port/port16.c port/port32.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# Interrupts
+# --------------------------------------------------
+
+build/interrupts.o: interrupts/interrupts.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/interruptstub.o: interrupts/interruptstubs.s | $(BUILD_DIR)
+	as $(ASFLAGS) -o $@ $<
+
 
 # --------------------------------------------------
 # Assembly
