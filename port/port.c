@@ -12,3 +12,9 @@ void Port_deinit(Port *self){
 static void Port8Bit_Write_impl(Port8Bit *self, uint8_t data) {
     asm volatile("outb (%0), (%1)" : : "a" (data), "Nd" (self->base.portnumber));
 }
+
+static uint8_t Port8Bit_Read_impl(Port8Bit *self) {
+    uint8_t result;
+    asm volatile("inb %1, %0" : "=a" (result) : "Nd" (self->base.portnumber));
+    return result;
+}

@@ -43,5 +43,8 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
 
     GlobalDescriptorTable gdt;
 
+    // 1. Build the actual GDT
+    GlobalDescriptorTable_Init(&gdt);
+
     while(1);
 }

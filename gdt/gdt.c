@@ -1,21 +1,26 @@
 #include "gdt.h"
 
-void SegmentDescriptor_Init(SegmentDescriptor* desc, uint32_t base, uint32_t limit, uint8_t type)
+void SegmentDescriptor_Init(
+    SegmentDescriptor* desc,
+    uint32_t base,
+    uint32_t limit,
+    uint8_t type
+)
 {
-    desc->base_hi = (base >> 24) & 0xFF;
-    desc->base_lo = base & 0xFFFF;
+    desc->base_lo  = base & 0xFFFF;
+    desc->base_hi  = (base >> 16) & 0xFF;
+    desc->base_vhi = (base >> 24) & 0xFF;
     desc->type = type;
 
-    if (limit <= 65536) {
-        /* 16-bit address space */
+    if (limit <= 0xFFFF) {
         desc->flags_limit_hi = 0x40;
     } else {
-        /* must be 4k aligned */
         if ((limit & 0xFFF) != 0xFFF) {
             limit = (limit >> 12) - 1;
         } else {
             limit = limit >> 12;
         }
+
         desc->flags_limit_hi = 0xC0;
     }
 
@@ -25,7 +30,9 @@ void SegmentDescriptor_Init(SegmentDescriptor* desc, uint32_t base, uint32_t lim
 
 uint32_t SegmentDescriptor_Base(const SegmentDescriptor* desc)
 {
-    return desc->base_lo | (desc->base_hi << 24);
+    return desc->base_lo |
+            ((uint32_t)desc->base_hi << 16) |
+            ((uint32_t)desc->base_vhi << 24);
 }
 
 uint32_t SegmentDescriptor_Limit(const SegmentDescriptor* desc)
