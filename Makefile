@@ -12,7 +12,7 @@ VM_NAME = MyOS
 # --------------------------------------------------
 # Object files
 # --------------------------------------------------
-OBJECTS = build/loader.o build/kernel.o build/gdt.o build/port.o build/interruptstub.o build/interrupts.o
+OBJECTS = build/loader.o build/kernel.o build/gdt.o build/port.o build/interruptstub.o build/interrupts.o build/keyboard.o
 
 # --------------------------------------------------
 # Targets
@@ -52,6 +52,13 @@ build/gdt.o: gdt/gdt.c | $(BUILD_DIR)
 # --------------------------------------------------
 
 build/port.o: port/port.c port/port.h port/port8.c port/port8Slow.c port/port16.c port/port32.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# Keyboard
+# --------------------------------------------------
+
+build/keyboard.o:	hardware/keyboard/keyboard.c hardware/keyboard/keyboard.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------

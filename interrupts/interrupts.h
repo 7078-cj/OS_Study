@@ -5,6 +5,35 @@
 #include "../port/port.h"
 #include "../gdt/gdt.h"
 
+typedef struct InterruptManager InterruptManager;
+typedef struct InterruptHandler InterruptHandler;
+
+
+typedef struct InterruptManager {
+    GlobalDescriptorTable* gdt;
+    Port8Bit picMasterCommand;
+    Port8Bit picMasterData;
+    Port8Bit picSlaveCommand;
+    Port8Bit picSlaveData;
+    InterruptHandler* handlers[256];
+
+} InterruptManager;
+
+typedef struct  InterruptHandler
+{
+    uint8_t interruptNumber;
+    InterruptManager* interruptManager;
+
+    uint32_t (*HandleInterrupt)(void* self, uint32_t esp);
+
+
+} InterruptHandler;
+
+void InterruptHandler_Init(InterruptHandler *self, uint8_t interruptNumber, InterruptManager *im);
+void InterruptHandler_Deactivate(InterruptHandler *self, uint8_t interruptNumber, InterruptManager *im);
+uint32_t InterruptHandler_HandleInterrupt(void* self, uint32_t esp);
+
+
 
 typedef struct GateDescriptor
 {
@@ -33,19 +62,14 @@ void InterruptManager_SetInterruptDescriptorTableEntry(
     uint8_t DescriptorType
 );
 
-void InterruptManager_Initialize(GlobalDescriptorTable* gdt);
-void InterruptManager_Destroy(void);
+void InterruptManager_Initialize(InterruptManager* self, GlobalDescriptorTable* gdt);
+void InterruptManager_Destroy(InterruptManager* self);
 
-void Activate();
+void Activate(InterruptManager* self);
 
 uint32_t InterruptManager_HandleInterrupt(uint8_t interruptNumber, uint32_t esp);
 
-
-static Port8Bit picMasterCommand;
-static Port8Bit picMasterData;
-static Port8Bit picSlaveCommand;
-static Port8Bit picSlaveData;
-
+uint32_t DoHandleInterrupt(InterruptManager* self,uint8_t interruptNumber, uint32_t esp);
 
 extern void IgnoreInterruptRequest();
 

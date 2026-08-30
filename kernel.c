@@ -2,6 +2,7 @@
 #include "gdt/gdt.h"
 #include "port/port.h"
 #include "interrupts/interrupts.h"
+#include "hardware/keyboard/keyboard.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
@@ -55,13 +56,18 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
     printf("Wrahhhhh \n");
 
     GlobalDescriptorTable gdt;
+    InterruptManager im;
 
     // 1. Build the actual GDT
     GlobalDescriptorTable_Init(&gdt);
 
     //2. initialize the Interrupt table
-    InterruptManager_Initialize(&gdt);
-    Activate();
+    InterruptManager_Initialize(&im, &gdt);
+
+    KeyboardDriver kd;
+    KeyboardDriver_init(&kd, &im);
+
+    Activate(&im);
 
     while(1);
 }
