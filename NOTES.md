@@ -532,7 +532,34 @@ Port8Bit_Write(&self->dataport, status);
 
 ---
 
-## 7. One-Sentence Summary
+## 7. A Simpler Example (No Keyboard)
+
+The command-port / data-port split isn't unique to keyboards — it's a pattern almost every hardware chip uses. Here's a made-up, simplified example: imagine a **fake thermostat chip** with two ports:
+
+- `COMMAND_PORT = 0x70` — "what do you want me to do"
+- `DATA_PORT = 0x71` — "the actual number involved"
+
+**Reading the current temperature:**
+```c
+Port8Bit_Write(&commandPort, 0x01);       // command 0x01 = "prepare current temperature"
+uint8_t temp = Port8Bit_Read(&dataPort);  // now go collect it
+```
+Step 1 doesn't give you a temperature — it's an instruction telling the chip "get the temperature ready." Step 2 is the actual pickup, on a completely different port.
+
+**Setting a new target temperature:**
+```c
+Port8Bit_Write(&commandPort, 0x02);       // command 0x02 = "next data-port write is a new target"
+Port8Bit_Write(&dataPort, 22);            // the actual value: 22°C
+```
+Same shape again: the command port says *what kind of operation is coming*, the data port carries *the number itself*.
+
+Notice the command port is `Write`-only in both cases — you never `Read` it expecting a temperature back. If you did `Read(commandPort)`, you'd just get some unrelated status flag (like "am I busy right now"), not the value you actually wanted. **The command port triggers the action; the data port is where the real value travels, in whichever direction the action requires.**
+
+This exact two-port pattern (one port for "what to do," one port for "the value") shows up again and again in real hardware — disk controllers, sound chips, real-time clocks — not just the keyboard.
+
+---
+
+## 8. One-Sentence Summary
 
 > `Write` = *"physically push this exact byte onto the wire addressed to this exact port number, right now."*
 > `Read` = *"physically pull whatever byte the chip on this exact port number currently has ready, right now."*
