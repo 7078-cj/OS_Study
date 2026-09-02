@@ -32,6 +32,28 @@ void KeyboardDriver_init(KeyboardDriver* self, InterruptManager* im){
 }
 
 void printf(char* str);
+extern uint8_t CursorX;
+extern uint8_t CursorY;
+extern uint16_t* VideoMemory;
+
+void backspace()
+{
+    if (CursorX == 0)
+    {
+        if (CursorY == 0)
+            return; // already at top-left, nothing to erase
+
+        CursorY--;
+        CursorX = 79;
+    }
+    else
+    {
+        CursorX--;
+    }
+
+    int offset = CursorY * 80 + CursorX;
+    VideoMemory[offset] = (VideoMemory[offset] & 0xFF00) | ' ';
+}
 
 uint32_t KeyboardDriver_HandleInterrupt(
     void *self,
@@ -198,7 +220,7 @@ uint32_t KeyboardDriver_HandleInterrupt(
 
             /* Special */
             case 0x01: printf("ESC"); break;
-            case 0x0E: printf("BACKSPACE"); break;
+            case 0x0E: backspace(); break;
             case 0x0F: printf("TAB"); break;
             case 0x1C: printf("ENTER"); break;
             case 0x39: printf(" "); break;

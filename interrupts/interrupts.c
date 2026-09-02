@@ -71,6 +71,7 @@ void InterruptManager_Initialize(
 
     InterruptManager_SetInterruptDescriptorTableEntry(0x20, codeSegment, &HandleInterruptRequest0x00, 0, IDT_INTERRUPT_GATE);
     InterruptManager_SetInterruptDescriptorTableEntry(0x21, codeSegment, &HandleInterruptRequest0x01, 0, IDT_INTERRUPT_GATE);
+    InterruptManager_SetInterruptDescriptorTableEntry(0x2C, codeSegment, &HandleInterruptRequest0x0C, 0, IDT_INTERRUPT_GATE);
 
     Port8Bit_init(&self->picMasterCommand, PIC1_COMMAND);
     Port8Bit_init(&self->picMasterData,    PIC1_DATA);
@@ -113,7 +114,7 @@ void InterruptManager_Destroy(InterruptManager* self)
     
 }
 
-void Activate(InterruptManager* self){
+void InterruptManager_Activate(InterruptManager* self){
 
     if(ActiveInterruptManager != 0){
         InterruptManager_Destroy(ActiveInterruptManager);

@@ -65,7 +65,7 @@ void InterruptManager_SetInterruptDescriptorTableEntry(
 void InterruptManager_Initialize(InterruptManager* self, GlobalDescriptorTable* gdt);
 void InterruptManager_Destroy(InterruptManager* self);
 
-void Activate(InterruptManager* self);
+void InterruptManager_Activate(InterruptManager* self);
 
 uint32_t InterruptManager_HandleInterrupt(uint8_t interruptNumber, uint32_t esp);
 
@@ -75,5 +75,6 @@ extern void IgnoreInterruptRequest();
 
 extern void HandleInterruptRequest0x00();
 extern void HandleInterruptRequest0x01();
+extern void HandleInterruptRequest0x0C();
 
 #endif

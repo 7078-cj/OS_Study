@@ -3,6 +3,7 @@
 #include "port/port.h"
 #include "interrupts/interrupts.h"
 #include "hardware/keyboard/keyboard.h"
+#include "hardware/mouse/mouse.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
@@ -67,7 +68,11 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
     KeyboardDriver kd;
     KeyboardDriver_init(&kd, &im);
 
-    Activate(&im);
+    MouseDriver md;
+    MouseDriver_init(&md, &im);
 
-    while(1);
+    InterruptManager_Activate(&im);
+
+    while(1){
+    }
 }

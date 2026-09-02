@@ -565,3 +565,175 @@ This exact two-port pattern (one port for "what to do," one port for "the value"
 > `Read` = *"physically pull whatever byte the chip on this exact port number currently has ready, right now."*
 
 Neither one touches RAM, neither one is "storage" — they're the CPU's only two verbs for having a live, real-time conversation with physical hardware.
+
+# Notes: `mouse.c` — Annotated
+
+Same building blocks as the keyboard driver (same controller, same command/data port pattern), plus two new ideas: **talking to the "second" PS/2 channel**, and **accumulating a multi-byte packet across several interrupts** before acting on it.
+
+---
+
+## Part 1 — `MouseDriver_init`
+
+```c
+InterruptHandler_Init(&self->interruptHandler, 0x2C, im);
+```
+Registers this handler for interrupt `0x2C`. Recall the formula from `interrupts_asm.s`: `IRQ_BASE (0x20) + IRQ number`. So `0x2C - 0x20 = 0x0C = 12` → this is **IRQ12**, the PS/2 mouse's dedicated hardware line — completely separate from the keyboard's IRQ1 (`0x21`), even though both devices share the same controller chip.
+
+```c
+Port8Bit_init(&self->dataport, 0x60);
+Port8Bit_init(&self->commandPort, 0x64);
+```
+Same two ports as the keyboard — confirms what we covered earlier: this is one shared 8042-style controller serving both devices, distinguished by IRQ number, not by port number.
+
+```c
+self->offset = 0;
+self->buttons = 0;
+self->buffer[0] = 0; self->buffer[1] = 0; self->buffer[2] = 0;
+```
+A PS/2 mouse doesn't send one byte per event like the keyboard — it sends **packets of 3 bytes** (button state, X delta, Y delta). `offset` tracks *which byte of the current packet* we're waiting for; `buffer` holds the bytes as they trickle in, one interrupt at a time.
+
+```c
+uint16_t* VideoMemory = (uint16_t*)0xb8000;
+
+VideoMemory[80 * 12 + 40] = ((VideoMemory[80*12+40] & 0xF000) >> 4)
+                          | ((VideoMemory[80*12+40] & 0x0F00) << 4)
+                          | (VideoMemory[80*12+40] & 0x00FF);
+```
+Draws the **initial cursor** at the screen's center (row 12, column 40 — since the text mode is 80×25). This is the same `VideoMemory` trick from `printf`, but instead of writing a *character*, it's swapping the **color attribute nibbles**.
+
+Reminder of the video memory layout: each on-screen character is 2 bytes — low byte = the ASCII character, high byte = `background:foreground` color (4 bits each). This line swaps the top nibble (background color) and the next nibble (foreground color):
+```
+0xF000 >> 4   → moves background color down into foreground position
+0x0F00 << 4   → moves foreground color up into background position
+0x00FF        → keeps the actual character untouched
+```
+**Plain-English effect:** it inverts the colors on that one screen cell — swap foreground/background, like flipping black-on-white to white-on-black — without touching what letter is there. That's the whole "cursor" — just an inverted-color block sitting on top of whatever character is underneath.
+
+```c
+Port8Bit_Write(&self->commandPort, 0xA8); // activate keyboard communication
+```
+The comment is copy-pasted from the keyboard driver and is **wrong** here — `0xA8` is actually **"Enable Second PS/2 Port"** (the mouse channel), the mouse's counterpart to the keyboard's `0xAE`. Worth fixing that comment if you're maintaining this.
+
+```c
+Port8Bit_Write(&self->commandPort, 0x20); // get the current state
+uint8_t status = Port8Bit_Read(&self->dataport) | 2;
+```
+Exact same "request the config byte" pattern from the keyboard driver: `Write(0x20)` to the command port → `Read` from the data port to collect the reply.
+
+The bit being set is different though: `| 2` sets **bit 1**, which is *"enable IRQ12 (interrupt on second port/mouse activity)"* — the mouse's version of the bit-0 flag the keyboard driver set for IRQ1.
+
+```c
+Port8Bit_Write(&self->commandPort, 0x60);
+Port8Bit_Write(&self->dataport, status);
+```
+Same "write back the modified config byte" pattern as the keyboard: `0x60` = "next data-port write is the new config," then deliver it.
+
+```c
+Port8Bit_Write(&self->commandPort, 0xD4);
+Port8Bit_Write(&self->dataport, 0xF4);
+```
+This pair is new and important: `0xD4` = **"the next byte I send is meant for the second PS/2 port (the mouse), not the controller itself."** This is how the shared controller knows *which device* the following byte is addressed to. Then `0xF4` = "Enable Data Reporting" — the mouse's equivalent of the keyboard's "enable scanning" command, sent through this `0xD4` redirection.
+
+```c
+Port8Bit_Read(&self->dataport);
+```
+The mouse acknowledges commands (typically with `0xFA` = ACK) — this read just drains that acknowledgment byte so it doesn't sit around and confuse the very first real packet read later.
+
+---
+
+## Part 2 — `MouseDriver_HandleInterrupt`
+
+```c
+uint8_t status = Port8Bit_Read(&mouse->commandPort);
+
+if (!(status & 0x20))
+{
+    return esp;
+}
+```
+Reading the **command port** here actually reads the **status register** (remember: reading `0x64` ≠ writing `0x64`, they mean different things). Bit `0x20` (bit 5) means *"this waiting byte came from the second PS/2 port (mouse), not the first (keyboard)."*
+
+This check exists because **both devices share IRQ delivery through the same controller path in some edge cases** — this is a safety check to make sure you're not about to misinterpret a keyboard byte as mouse data. If it's not actually mouse data, bail out immediately.
+
+```c
+mouse->buffer[mouse->offset] = Port8Bit_Read(&mouse->dataport);
+mouse->offset = (mouse->offset + 1) % 3;
+```
+Read one byte from the data port (same `0x60` as always) and stash it at the current offset. `% 3` wraps the offset back to `0` after collecting 3 bytes — this is the **packet accumulator**: this interrupt fires three separate times (once per byte), and only the *third* firing has a complete, usable packet.
+
+```c
+static int8_t x = 40;
+static int8_t y = 12;
+static uint8_t cursorHighlighted = 0;
+```
+`static` locals — these persist between function calls (unlike normal locals, which reset every call) but aren't struct members either. `x`/`y` track cursor position on screen, initialized to match the center cell drawn in `_init`. `cursorHighlighted` tracks whether the cursor cell currently has an *extra* color-invert on it from a button click (so it can be cleanly undone later without double-inverting).
+
+```c
+if (mouse->offset == 0)
+{
+```
+Since `offset` just wrapped back to 0, this block **only runs once every 3 interrupts** — i.e., only when a complete packet has arrived. The first two interrupts just silently fill the buffer and return.
+
+```c
+VideoMemory[80 * y + x] = (...) invert colors (...)
+```
+**Erase the old cursor** — un-invert the cell at the *previous* `x, y` position, restoring it to how it looked before the cursor was drawn there.
+
+```c
+if (cursorHighlighted)
+{
+    VideoMemory[...] = (...) invert again (...)
+    cursorHighlighted = 0;
+}
+```
+If a click-highlight was *also* applied on top of the cursor invert last time, undo that second invert too, and clear the flag. (Two inverts in a row cancel out back to original colors — this is why order matters: undo the extra highlight *before* moving to a new cell, or you'd leave a stray inverted cell behind at the old position.)
+
+```c
+x += mouse->buffer[1];
+if (x < 0) x = 0;
+if (x >= 80) x = 79;
+
+y -= mouse->buffer[2];
+if (y < 0) y = 0;
+if (y >= 25) y = 24;
+```
+`buffer[1]` and `buffer[2]` are the mouse's raw **X and Y movement deltas** (how far it moved since the last packet, signed — hence `int8_t`). Apply them to the cursor position, then **clamp** to the screen's 80×25 text-mode bounds so the cursor can't wander off-screen. `y` is *subtracted* because PS/2 mice report Y as "up is positive," but screen rows count *downward* — this flips it to match.
+
+```c
+VideoMemory[80 * y + x] = (...) invert (...)
+```
+**Draw the new cursor** at the updated position — same invert trick, now on the new cell.
+
+```c
+if (mouse->buffer[0] & 0x07)
+{
+    VideoMemory[...] = (...) invert again (...)
+    cursorHighlighted = 1;
+}
+```
+`buffer[0]` is the **button/status byte** — its low 3 bits are the left, right, and middle button states. `& 0x07` checks *"is any button currently held down."* If so, invert the cursor cell *again* (a second invert on top of the cursor invert gives a visually distinct "highlighted/clicking" look), and remember that with `cursorHighlighted` so it gets properly undone next time the cursor moves.
+
+```c
+mouse->buttons = mouse->buffer[0];
+```
+Save the latest button state onto the struct itself, presumably so other code (outside this interrupt handler) could later check `mouse->buttons` to see what's currently pressed.
+
+---
+
+## Part 3 — Why the Double-Invert Trick Instead of Redrawing
+
+Notice this driver never actually **saves what character was under the cursor** and restores it — it purely relies on "invert, then invert again = back to original." This is clever but has one build-you-should-know-about limitation: it assumes **nothing else changes that cell's colors while the cursor sits on it**. If, say, a keyboard-driven `printf` wrote a differently-colored character to that exact cell while the mouse was hovering there, the "undo" invert on the next mouse move would restore the *wrong* colors (whatever was there before, not what's actually there now). Fine for a simple demo cursor; a more robust cursor would snapshot-and-restore the actual cell contents instead of blindly re-inverting.
+
+---
+
+## Quick Comparison: Keyboard Driver vs. Mouse Driver
+
+| | Keyboard | Mouse |
+|---|---|---|
+| IRQ | `0x21` (IRQ1) | `0x2C` (IRQ12) |
+| Enable command | `0xAE` | `0xA8` |
+| Config bit set | bit 0 | bit 1 |
+| "Talk to this device" prefix | *(none needed — first port is default)* | `0xD4` |
+| Enable-output command | `0xF4` (scanning) | `0xF4` (data reporting — same byte value, different meaning to a different device) |
+| Bytes per event | 1 | 3 (accumulated across interrupts) |
+| Data meaning | scancode → character lookup | button byte + X delta + Y delta |
