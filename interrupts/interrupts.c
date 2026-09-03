@@ -2,6 +2,7 @@
 #include "../port/port.h"
 
 extern void printf(char* str);
+extern void printHex(uint8_t key);
 
 GateDescriptor interruptDescriptorTable[256];
 InterruptManager* ActiveInterruptManager = 0;
@@ -10,6 +11,8 @@ InterruptManager* ActiveInterruptManager = 0;
 #define PIC1_DATA    0x21
 #define PIC2_COMMAND 0xA0
 #define PIC2_DATA    0xA1
+
+
 
 uint32_t InterruptHandler_HandleInterrupt(
     void *self,
@@ -135,11 +138,9 @@ extern uint32_t DoHandleInterrupt(InterruptManager* self,uint8_t interruptNumber
     }
 
     else if(interruptNumber != 0x20){
-        char* foo = "UNHANDLED INTERRUPT 0x00";
-        char* hex = "0123456789ABCDEF";
-        foo[22] = hex[(interruptNumber >> 4) & 0x0F];
-        foo[23] = hex[interruptNumber & 0x0f];
+        char* foo = "UNHANDLED INTERRUPT";
         printf(foo);
+        printHex(interruptNumber);
     }
     
 

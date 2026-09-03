@@ -41,6 +41,14 @@ void printf(char* str)
         }
     }
 }
+void printHex(uint8_t key)
+{
+    char* foo = "00";
+    char* hex = "0123456789ABCDEF";
+    foo[0] = hex[(key >> 4) & 0x0F];
+    foo[1] = hex[key & 0x0f];
+    printf(foo);
+}
 
 typedef void (*constructor)(void);
 
@@ -65,11 +73,18 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
     //2. initialize the Interrupt table
     InterruptManager_Initialize(&im, &gdt);
 
+    DriverManager dm;
+    DriverManager_init(&dm);
+
     KeyboardDriver kd;
     KeyboardDriver_init(&kd, &im);
+    DriverManager_addDriver(&dm, &kd.driver);
 
     MouseDriver md;
     MouseDriver_init(&md, &im);
+    DriverManager_addDriver(&dm, &md.driver);
+
+    DriverManager_activate(&dm);
 
     InterruptManager_Activate(&im);
 

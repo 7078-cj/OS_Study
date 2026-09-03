@@ -12,7 +12,7 @@ VM_NAME = MyOS
 # --------------------------------------------------
 # Object files
 # --------------------------------------------------
-OBJECTS = build/loader.o build/kernel.o build/gdt.o build/port.o build/interruptstub.o build/interrupts.o build/keyboard.o build/mouse.o
+OBJECTS = build/loader.o build/kernel.o build/gdt.o build/port.o build/interruptstub.o build/interrupts.o build/keyboard.o build/mouse.o build/driver.o
 
 # --------------------------------------------------
 # Targets
@@ -34,6 +34,13 @@ $(BUILD_DIR):
 # --------------------------------------------------
 
 build/kernel.o: kernel.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# Driver
+# --------------------------------------------------
+
+build/driver.o: driver.c driver.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------

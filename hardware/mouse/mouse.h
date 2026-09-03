@@ -4,10 +4,22 @@
 #include "../../types.h"
 #include "../../port/port.h"
 #include "../../interrupts/interrupts.h"
+#include "../../driver.h"
+
+void MouseEventHandler_onKeyDown(
+    void* self
+);
+
+void MouseEventHandler_onKeyUp(
+    void* self
+);
+
 
 typedef struct MouseDriver
 {
+    
     InterruptHandler interruptHandler;
+    Driver driver;
 
     Port8Bit dataport;
     Port8Bit commandPort;
