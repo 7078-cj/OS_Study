@@ -15,6 +15,7 @@ void backspace()
 
         CursorY--;
         CursorX = 79;
+        
     }
     else
     {
