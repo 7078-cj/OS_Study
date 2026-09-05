@@ -1,9 +1,9 @@
-#ifndef INTERRUPTS_H
-#define INTERRUPTS_H
+#ifndef __INTERRUPTS_H
+#define __INTERRUPTS_H
 
-#include "../types.h"
-#include "../port/port.h"
-#include "../gdt/gdt.h"
+#include "../common/types.h"
+#include "port.h"
+#include "../gdt.h"
 
 typedef struct InterruptManager InterruptManager;
 typedef struct InterruptHandler InterruptHandler;

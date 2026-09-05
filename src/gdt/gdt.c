@@ -1,4 +1,4 @@
-#include "gdt.h"
+#include "../../include/gdt.h"
 
 void SegmentDescriptor_Init(
     SegmentDescriptor* desc,

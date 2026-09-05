@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "MyOS",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}",
+                "${workspaceFolder}/src"
+            ],
+            "defines": [],
+            "compilerPath": "gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-x86"
+        }
+    ],
+    "version": 4
+}

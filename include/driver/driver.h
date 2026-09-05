@@ -1,7 +1,7 @@
-#ifndef DRIVER_H
-#define DRIVER_H
+#ifndef __DRIVER_H
+#define __DRIVER_H
 
-#include "types.h"
+#include "../common/types.h"
 
 typedef struct Driver
 {

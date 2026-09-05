@@ -1,10 +1,10 @@
-#ifndef KEYBOARD_H
-#define KEYBOARD_H
+#ifndef __KEYBOARD_H
+#define __KEYBOARD_H
 
-#include "../../types.h"
-#include "../../port/port.h"
-#include "../../interrupts/interrupts.h"
-#include "../../driver.h"
+#include "../common/types.h"
+#include "../hardwarecommunication/port.h"
+#include "../hardwarecommunication/interrupts.h"
+#include "../driver/driver.h"
 
 void KeyboardEventHandler_onKeyDown(
     void* self,

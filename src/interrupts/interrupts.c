@@ -1,5 +1,5 @@
-#include "interrupts.h"
-#include "../port/port.h"
+#include "hardwarecommunication/interrupts.h"
+#include "hardwarecommunication/port.h"
 
 extern void printf(char* str);
 extern void printHex(uint8_t key);

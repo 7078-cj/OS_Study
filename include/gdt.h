@@ -1,7 +1,7 @@
 #ifndef __GDT_H              // if __GDT_H hasn't been defined yet, keep reading this file...
 #define __GDT_H               // ...and now mark it as defined, so this file can't be included twice
 
-#include "../types.h"        // bring in uint8_t, uint16_t, uint32_t (small/medium/big number types)
+#include "common/types.h"        // bring in uint8_t, uint16_t, uint32_t (small/medium/big number types)
 
 // Describes ONE entry in the GDT (Global Descriptor Table).
 // This is the exact byte-for-byte layout the CPU expects to read —

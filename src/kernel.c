@@ -1,9 +1,9 @@
-#include "types.h"
-#include "gdt/gdt.h"
-#include "port/port.h"
-#include "interrupts/interrupts.h"
-#include "hardware/keyboard/keyboard.h"
-#include "hardware/mouse/mouse.h"
+#include "common/types.h"
+#include "gdt.h"
+#include "hardwarecommunication/port.h"
+#include "hardwarecommunication/interrupts.h"
+#include "driver/keyboard.h"
+#include "driver/mouse.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 

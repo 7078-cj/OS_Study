@@ -1,6 +1,6 @@
 CC = gcc
 
-CFLAGS = -m32 -ffreestanding -fno-pie -fno-stack-protector -fno-builtin
+CFLAGS = -m32 -ffreestanding -fno-pie -fno-stack-protector -fno-builtin -Iinclude
 ASFLAGS = --32
 LDFLAGS = -melf_i386
 
@@ -33,14 +33,14 @@ $(BUILD_DIR):
 # Root-level C files
 # --------------------------------------------------
 
-build/kernel.o: kernel.c | $(BUILD_DIR)
+build/kernel.o: src/kernel.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
 # Driver
 # --------------------------------------------------
 
-build/driver.o: driver.c driver.h | $(BUILD_DIR)
+build/driver.o: src/driver.c include/driver/driver.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
@@ -51,38 +51,38 @@ build/driver.o: driver.c driver.h | $(BUILD_DIR)
 # paging/paging.c -> build/paging.o
 # --------------------------------------------------
 
-build/gdt.o: gdt/gdt.c | $(BUILD_DIR)
+build/gdt.o: src/gdt/gdt.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
 # Port
 # --------------------------------------------------
 
-build/port.o: port/port.c port/port.h port/port8.c port/port8Slow.c port/port16.c port/port32.c | $(BUILD_DIR)
+build/port.o: src/port/port.c include/hardwarecommunication/port.h src/port/port8.c src/port/port8Slow.c src/port/port16.c src/port/port32.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
 # Keyboard
 # --------------------------------------------------
 
-build/keyboard.o:	hardware/keyboard/keyboard.c hardware/keyboard/keyboard.h | $(BUILD_DIR)
+build/keyboard.o:	src/hardware/keyboard/keyboard.c include/driver/keyboard.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
 # Mouse
 # --------------------------------------------------
 
-build/mouse.o:	hardware/mouse/mouse.c hardware/mouse/mouse.h | $(BUILD_DIR)
+build/mouse.o:	src/hardware/mouse/mouse.c include/driver/mouse.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
 # Interrupts
 # --------------------------------------------------
 
-build/interrupts.o: interrupts/interrupts.c | $(BUILD_DIR)
+build/interrupts.o: src/interrupts/interrupts.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/interruptstub.o: interrupts/interruptstubs.s | $(BUILD_DIR)
+build/interruptstub.o: src/interrupts/interruptstubs.s | $(BUILD_DIR)
 	as $(ASFLAGS) -o $@ $<
 
 
@@ -90,7 +90,7 @@ build/interruptstub.o: interrupts/interruptstubs.s | $(BUILD_DIR)
 # Assembly
 # --------------------------------------------------
 
-build/loader.o: loader.s | $(BUILD_DIR)
+build/loader.o: src/loader.s | $(BUILD_DIR)
 	as $(ASFLAGS) -o $@ $<
 
 # --------------------------------------------------

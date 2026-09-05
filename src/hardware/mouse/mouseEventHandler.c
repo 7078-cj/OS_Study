@@ -1,4 +1,4 @@
-#include "mouse.h"
+#include "driver/mouse.h"
 
 void printf(char* str);
 
