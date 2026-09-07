@@ -737,3 +737,219 @@ Notice this driver never actually **saves what character was under the cursor** 
 | Enable-output command | `0xF4` (scanning) | `0xF4` (data reporting — same byte value, different meaning to a different device) |
 | Bytes per event | 1 | 3 (accumulated across interrupts) |
 | Data meaning | scancode → character lookup | button byte + X delta + Y delta |
+
+
+# Notes: `pci.c` — Annotated, with Visual Bit Diagrams
+
+PCI = **P**eripheral **C**omponent **I**nterconnect. This file is how your OS **discovers what hardware actually exists** on the machine — instead of hardcoding "the NIC is at port X," you *ask* the chipset "what's plugged in?" and it tells you, along with where to find each device's real registers.
+
+This reuses the exact command-port/data-port pattern from the keyboard and mouse — just at 32-bit width, and used to build a structured *request* instead of a simple command byte.
+
+---
+
+## Part 1 — `PCI_Init`
+
+```c
+Port32Bit_init(&self->dataPort, 0xCFC);
+Port32Bit_init(&self->commandPort, 0xCF8);
+```
+Same idea as `0x60`/`0x64` for the keyboard: two fixed, standardized ports.
+- `0xCF8` = **command port** ("CONFIG_ADDRESS") — you write *which device and register* you want to talk to.
+- `0xCFC` = **data port** ("CONFIG_DATA") — the actual 32-bit value goes in or out here.
+
+---
+
+## Part 2 — `PCI_Read` / `PCI_Write`: Building the "address" word
+
+```c
+uint32_t id =
+    0x1 << 31
+    | ((bus & 0xFF) << 16)
+    | ((device & 0x1F) << 11)
+    | ((function & 0x07) << 8)
+    | ((registeroffset & 0xFC))
+    | 0x80000000;
+```
+
+This single 32-bit number, sent to `0xCF8`, is a **structured request packet** — every bit range means something specific to the PCI chipset. Think of it like filling out a form with exact-width boxes, not free text.
+
+### Visual: How the 32-bit `id` word is assembled
+
+```
+Bit:   31 30 ......... 24 23 ............ 16 15 ....... 11 10  9  8 7 6 5 4 3 2 1 0
+      +--+----------------+------------------+-----------+-------+-------------+
+      |EN|    reserved    |    BUS (8 bits)  | DEV (5bit)| FN(3) | REG (8 bits)|
+      +--+----------------+------------------+-----------+-------+-------------+
+       ^                   ^                  ^           ^       ^
+       |                   |                  |           |       |
+   "enable bit"        which of 256        which of 32   which  which register
+   must be 1 to        possible buses      devices on    of 8   inside that
+   make this a         (0x1 << 31 /        that bus      funcs  device's config
+   real config          0x80000000,         (device       (function            space (offset,
+   request              same bit set        & 0x1F,       & 0x07,              4-byte aligned
+   (both terms in       twice — see          shifted      shifted              via & 0xFC)
+   the code are         "bug" note below)    left 11)      left 8)
+   the same bit!)
+```
+
+### Walking through each term, one at a time
+
+**`0x1 << 31`** — shifts the value `1` left by 31 bit positions, landing it at the very top bit (bit 31). This is the **enable bit**: the chipset ignores this entire word as a no-op *unless* this top bit is set to `1`. Think of it as writing "SEND" at the top of a form — without it, nothing happens even if every other field is filled in correctly.
+
+```
+0x1          = 00000000 00000000 00000000 00000001
+0x1 << 31    = 10000000 00000000 00000000 00000000
+```
+
+**`(bus & 0xFF) << 16`** — first, `& 0xFF` keeps only the low 8 bits of `bus` (masks off anything accidentally in higher bits, since a bus number is only ever 0–255). Then `<< 16` slides that whole byte up into bits 23–16.
+
+```
+bus = 0x03 (just as an example)
+
+step 1 — mask:      0x03 & 0xFF   = 00000011                          (unchanged, already fits in 8 bits)
+step 2 — shift <<16: 00000011  →  00000011 00000000 00000000
+                     (byte moved from the bottom all the way up to bits 23-16)
+```
+
+**`(device & 0x1F) << 11`** — `0x1F` = `0001 1111` in binary, a 5-bit mask (keeps only values 0–31, since a bus can only have 32 device slots). Shifted left by 11 to land in bits 15–11.
+
+```
+device = 0x05
+
+step 1 — mask:      0x05 & 0x1F  = 00101   (5 bits, unchanged since 5 < 31)
+step 2 — shift <<11: 00101 → 00000000 00101000 00000000  (bits 15-11 now hold 00101)
+```
+
+**`(function & 0x07) << 8`** — `0x07` = `111` in binary, a 3-bit mask (a device can expose up to 8 functions, 0–7). Shifted left by 8 to land in bits 10–8.
+
+```
+function = 0x01
+
+step 1 — mask:     0x01 & 0x07  = 001
+step 2 — shift <<8: 001 → 00000000 00000001 00000000
+```
+
+**`(registeroffset & 0xFC)`** — `0xFC` = `1111 1100` in binary. This masks OFF the **bottom 2 bits**, forcing the register offset to always be a multiple of 4. PCI config space is only addressable in 4-byte (32-bit) chunks — you can't request "byte 5," only "the 4-byte word starting at byte 4," and then pick out the specific byte afterward (which is exactly what the shift at the end of `PCI_Read` does — see Part 3).
+
+```
+registeroffset = 0x0B  (looks like: 00001011)
+
+& 0xFC (11111100):     00001011
+                      & 11111100
+                      -----------
+                        00001000   = 0x08
+
+→ any offset from 0x08-0x0B all collapse to requesting the same 4-byte-aligned word at 0x08
+```
+
+### All the pieces OR'd together
+
+`|` (bitwise OR) is used here specifically *because* every piece above was carefully shifted into its own non-overlapping bit range — like puzzle pieces that only fit one specific slot. ORing them together just merges each piece into the final word without any of them stepping on each other:
+
+```
+   10000000 00000000 00000000 00000000   (enable bit, bit 31)
+ | 00000011 00000000 00000000 00000000   (bus, bits 23-16)
+ | 00000000 00101000 00000000 00000000   (device, bits 15-11)
+ | 00000000 00000001 00000000 00000000   (function, bits 10-8)
+ | 00000000 00000000 00001000 00000000   (register, bits 7-0, example)
+ -----------------------------------------
+   10000000 11101001 00001000 00000000   <- final "id" sent to 0xCF8
+```
+
+**Small bug worth knowing:** `0x1 << 31` and `0x80000000` are the exact same bit (bit 31) — the code effectively sets the enable bit twice (harmless, since OR-ing the same bit with itself changes nothing, but it's redundant/confusing to a reader).
+
+---
+
+## Part 3 — `PCI_Read`: getting the answer back, and the final byte-shift
+
+```c
+Port32Bit_Write(&self->commandPort, id);
+uint32_t result = Port32Bit_Read(&self->dataPort);
+
+return result >> (8 * (registeroffset % 4));
+```
+
+You write the request word to `0xCF8`, then read a **full 32-bit word** back from `0xCFC` — but you often only wanted one specific byte (or 16-bit field) *inside* that word, not the whole thing. Remember from Part 2: the register offset got rounded down to a 4-byte boundary before the request was even sent — so if you asked for offset `0x0B`, the chipset actually gave you back the whole 4-byte chunk starting at `0x08`, and it's on you to pick out the right byte from within it.
+
+### Visual: extracting the right byte from the returned word
+
+```
+registeroffset % 4  tells you WHERE inside the 4-byte word your target byte lives:
+
+  offset % 4 == 0  →  target byte is the LOWEST byte   → shift right by 0  bits
+  offset % 4 == 1  →  target byte is the 2nd byte       → shift right by 8  bits
+  offset % 4 == 2  →  target byte is the 3rd byte        → shift right by 16 bits
+  offset % 4 == 3  →  target byte is the HIGHEST byte    → shift right by 24 bits
+```
+
+Concrete example — say `registeroffset = 0x0B` (`0x0B % 4 = 3`), and the chipset returned:
+
+```
+result = 0x12345678
+
+  byte 3 (highest)   byte 2            byte 1            byte 0 (lowest)
+  0x12                0x34              0x56              0x78
+  [bits 31-24]        [bits 23-16]      [bits 15-8]        [bits 7-0]
+
+registeroffset % 4 == 3  →  we want byte 3  →  shift right by 8*3 = 24 bits
+
+result >> 24:
+  0x12345678 >> 24  =  0x00000012
+
+→ caller gets back 0x12 (with garbage/zero in the upper bytes — see note below)
+```
+
+**Note worth flagging:** the function returns a full `uint32_t`, still containing whatever was in the bits *above* the byte you wanted (in this case, zeros, since a right-shift fills with zeros — but only because we shifted the *top* byte all the way down; for `%4==0` or `%4==1` cases, the upper, unwanted bytes are still sitting there, un-masked). Callers rely on assigning the result into a narrower field (like `descriptor.vendor_id`, presumably declared `uint16_t`) to silently truncate away the extra bits — which works, but is a bit fragile: a more defensive version would explicitly mask after shifting, e.g. `(result >> shift) & 0xFF` for a byte-sized field.
+
+---
+
+## Part 4 — `PCI_DeviceHasFunctions`
+
+```c
+uint32_t headerType = PCI_Read(self, bus, device, 0, 0x0E);
+return (headerType & 0x80) != 0;
+```
+Reads the **header type byte** (offset `0x0E` in PCI config space) and checks just the top bit (`0x80` = `1000 0000`). If that bit is set, the device is **multi-function** (like a controller card that exposes several sub-devices through one physical slot) — which is why `PCI_SelectDrivers` checks this to decide whether to scan 8 functions or just 1.
+
+---
+
+## Part 5 — `PCI_GetDeviceDescriptor`
+
+Just a sequence of `PCI_Read` calls at the well-known, standardized offsets defined by the PCI spec — this is essentially "fill out a form by reading each labeled field one at a time":
+
+| Offset | Field | What it tells you |
+|---|---|---|
+| `0x00` | vendor_id | Who made the chip (e.g. Intel, Realtek) |
+| `0x02` | device_id | Which specific chip model |
+| `0x08` | revision | Hardware revision number |
+| `0x09` | interface_id | Programming interface variant |
+| `0x0A` | subclass_id | More specific category |
+| `0x0B` | class_id | Broad device category (network, storage, display...) |
+| `0x3C` | interrupt | Which IRQ line this device is wired to |
+
+---
+
+## Part 6 — `PCI_SelectDrivers`: the actual scan
+
+```c
+for (uint16_t bus = 0; bus < 8; bus++)
+    for (uint16_t device = 0; device < 32; device++)
+    {
+        uint16_t functionCount = PCI_DeviceHasFunctions(...) ? 8 : 1;
+        for (uint16_t function = 0; function < functionCount; function++)
+        {
+            ...
+            if (descriptor.vendor_id == 0x0000 || descriptor.device_id == 0xFFFF)
+                break;   // no device present at this slot
+            ...
+        }
+    }
+```
+
+This brute-forces every possible bus/device/function combination and asks each one "are you real?" — an empty slot reads back all-`1`s or all-`0`s (`0xFFFF`/`0x0000`), which is how you tell "nothing here" from "a real device." This is exactly the discovery mechanism referenced back when we talked about network cards not having a fixed port — this loop **is** that discovery step. Once you have a `descriptor`, the next piece (not shown here — the comment even flags it as a TODO) would check `class_id`/`subclass_id` and hand the descriptor off to the matching driver (NIC, disk controller, etc.) via `DriverManager`.
+
+---
+
+## One-Sentence Summary
+
+> The command port (`0xCF8`) is a **structured request** — bus, device, function, and register all packed into specific, non-overlapping bit ranges of one 32-bit word — and the data port (`0xCFC`) hands back a whole 4-byte-aligned chunk that you then shift down to pull out the specific byte(s) you actually asked for.
