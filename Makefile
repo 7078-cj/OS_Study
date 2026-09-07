@@ -12,7 +12,16 @@ VM_NAME = MyOS
 # --------------------------------------------------
 # Object files
 # --------------------------------------------------
-OBJECTS = build/loader.o build/kernel.o build/gdt.o build/port.o build/interruptstub.o build/interrupts.o build/keyboard.o build/mouse.o build/driver.o
+OBJECTS = build/loader.o \
+	build/kernel.o \
+	build/gdt.o \
+	build/port.o \
+	build/interruptstub.o \
+	build/interrupts.o \
+	build/keyboard.o \
+	build/mouse.o \
+	build/driver.o \
+	build/pci.o
 
 # --------------------------------------------------
 # Targets
@@ -73,6 +82,13 @@ build/keyboard.o:	src/hardware/keyboard/keyboard.c include/driver/keyboard.h | $
 # --------------------------------------------------
 
 build/mouse.o:	src/hardware/mouse/mouse.c include/driver/mouse.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# PCI
+# --------------------------------------------------
+
+build/pci.o:	src/hardware/pci.c include/hardwarecommunication/pci.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------

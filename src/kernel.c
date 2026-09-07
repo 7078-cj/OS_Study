@@ -4,6 +4,8 @@
 #include "hardwarecommunication/interrupts.h"
 #include "driver/keyboard.h"
 #include "driver/mouse.h"
+#include "driver/driver.h"
+#include "hardwarecommunication/pci.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
@@ -83,6 +85,10 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
     MouseDriver md;
     MouseDriver_init(&md, &im);
     DriverManager_addDriver(&dm, &md.driver);
+
+    PeripheralComponentInterconnectDeviceController pciController;
+    PCI_Init(&pciController);
+    PCI_SelectDrivers(&pciController, &dm);
 
     DriverManager_activate(&dm);
 
