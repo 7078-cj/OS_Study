@@ -6,6 +6,7 @@
 #include "driver/mouse.h"
 #include "driver/driver.h"
 #include "hardwarecommunication/pci.h"
+#include "driver/vga.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
@@ -90,9 +91,20 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
     PCI_Init(&pciController);
     PCI_SelectDrivers(&pciController, &dm, &im);
 
+    VideoGraphicsArray vga;
+    VideoGraphicsArray_init(&vga);
+    DriverManager_addDriver(&dm, &vga.driver);
+
     DriverManager_activate(&dm);
 
     InterruptManager_Activate(&im);
+
+    VideoGraphicsArray_setMode(&vga, 320, 200, 8);
+    for (int32_t y=0; y<200; y++){
+        for(int32_t x=0; x < 320; x++){
+            VideoGraphicsArray_putPixel(&vga, x, y, 0x00, 0x00, 0xA8);
+        }
+    }
 
     while(1){
     }

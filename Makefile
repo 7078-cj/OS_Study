@@ -21,7 +21,8 @@ OBJECTS = build/loader.o \
 	build/keyboard.o \
 	build/mouse.o \
 	build/driver.o \
-	build/pci.o
+	build/pci.o \
+	build/vga.o \
 
 # --------------------------------------------------
 # Targets
@@ -89,6 +90,13 @@ build/mouse.o:	src/hardware/mouse/mouse.c include/driver/mouse.h | $(BUILD_DIR)
 # --------------------------------------------------
 
 build/pci.o:	src/hardware/pci.c include/hardwarecommunication/pci.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# VGA
+# --------------------------------------------------
+
+build/vga.o:	src/hardware/vga.c include/driver/vga.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
