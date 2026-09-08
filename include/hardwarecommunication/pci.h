@@ -4,6 +4,21 @@
 #include "common/types.h"
 #include "hardwarecommunication/port.h"
 #include "driver/driver.h"
+#include "hardwarecommunication/interrupts.h"
+
+typedef enum BaseAddressRegisterType
+{
+    MemoryMapping = 0,
+    InputOutput = 1
+} BaseAddressRegisterType;
+
+typedef struct BaseAddressRegister
+{
+    bool prefetchable;
+    uint8_t* address;
+    uint32_t size;
+    BaseAddressRegisterType type;
+} BaseAddressRegister;
 
 typedef struct PeripheralComponentInterconnectDeviceDescriptor
 {
@@ -40,9 +55,9 @@ uint32_t PCI_Read(PeripheralComponentInterconnectDeviceController* self, uint16_
 void PCI_Write(PeripheralComponentInterconnectDeviceController* self, uint16_t bus, uint16_t device, uint16_t function, uint32_t registeroffset, uint32_t value);
 bool PCI_DeviceHasFunctions(PeripheralComponentInterconnectDeviceController* self, uint16_t bus, uint16_t device);
 
-void PCI_SelectDrivers(PeripheralComponentInterconnectDeviceController* self, DriverManager* driverManager);
+void PCI_SelectDrivers(PeripheralComponentInterconnectDeviceController* self, DriverManager* driverManager, InterruptManager* interruptManager);
 PeripheralComponentInterconnectDeviceDescriptor PCI_GetDeviceDescriptor(PeripheralComponentInterconnectDeviceController* self, uint16_t bus, uint16_t device, uint16_t function);
+BaseAddressRegister PCI_GetBaseAddressRegister(PeripheralComponentInterconnectDeviceController* self, uint16_t bus, uint16_t device, uint16_t function, uint16_t bar);
 
-
-
+Driver* DriverManager_getDriver(PeripheralComponentInterconnectDeviceDescriptor* device, DriverManager* driverManager, InterruptManager* interruptManager);
 #endif // __PCI_H

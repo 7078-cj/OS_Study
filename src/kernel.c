@@ -88,7 +88,7 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
 
     PeripheralComponentInterconnectDeviceController pciController;
     PCI_Init(&pciController);
-    PCI_SelectDrivers(&pciController, &dm);
+    PCI_SelectDrivers(&pciController, &dm, &im);
 
     DriverManager_activate(&dm);
 
