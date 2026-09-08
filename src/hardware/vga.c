@@ -118,10 +118,10 @@ uint8_t* VideoGraphicsArray_getFrameBufferSegment(VideoGraphicsArray* self){
     uint8_t segmentNumber =( Port8Bit_Read(&self->graphicsControllerDataPort) >> 2) & 0x03;
     switch (segmentNumber)
     {
-        case 0: return (uint8_t*)0x00000; // A0000
-        case 1: return (uint8_t*)0xA0000; // A0000
-        case 2: return (uint8_t*)0xB0000; // B0000
-        case 3: return (uint8_t*)0xB8000; // B8000
+        case 0: return (uint8_t*)0x00000; 
+        case 1: return (uint8_t*)0xA0000; 
+        case 2: return (uint8_t*)0xB0000; 
+        case 3: return (uint8_t*)0xB8000; 
     }
 }
 
