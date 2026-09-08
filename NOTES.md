@@ -950,6 +950,113 @@ This brute-forces every possible bus/device/function combination and asks each o
 
 ---
 
+## Part 7 — `PCI_GetBaseAddressRegister` (BARs): "Where does this device's data actually live?"
+
+Knowing a device *exists* (vendor ID, device ID, class) isn't enough to talk to it — you still need to know **where its registers are**: is it a set of `in`/`out` ports (like the keyboard's `0x60`/`0x64`), or a chunk of regular memory you can just read/write with pointers? That's exactly what a **BAR** (Base Address Register) tells you. Every PCI device can expose up to 6 of these (fewer for bridge-type devices), each one describing one "window" into that device.
+
+```c
+uint32_t headerType = PCI_Read(self, bus, device, function, 0x0E) & 0x7F;
+int maxBARs = (headerType == 0) ? 6 : 2;
+if (bar >= maxBARs) {
+    return result; // Invalid BAR index
+}
+```
+Not every device has all 6 BAR slots. A regular device (**header type 0**) has up to 6; a PCI-to-PCI **bridge** (header type 1) only has 2, because bridges use the other slots for different bridge-specific fields. This guards against reading a BAR slot that doesn't actually exist for this device type.
+
+*(Small inconsistency worth noting: `PCI_DeviceHasFunctions` masks header type with `0x80` — checking only the "multi-function" bit — while here it's masked with `0x7F`, keeping everything **except** that bit, to get the real 0/1 header type value. Both are correct for their own purpose, just easy to mix up at a glance since they look similar.)*
+
+```c
+uint32_t barValue = PCI_Read(self, bus, device, function, 0x10 + bar * 4);
+```
+BARs live at consecutive 4-byte offsets starting at `0x10` in PCI config space — `0x10, 0x14, 0x18, 0x1C, 0x20, 0x24` for BAR 0 through BAR 5. `0x10 + bar * 4` walks to whichever one you asked for.
+
+### Visual: What the raw BAR value actually encodes
+
+The **lowest bit** of a BAR is a flag that changes the meaning of *everything else* in the same 32-bit value:
+
+```
+Bit:    31 ................................. 4  3  2  1  0
+       +-------------------------------------+-------+---+
+       |         address bits (varies)        | type  | 0 |  <- Memory-mapped BAR (bit0 = 0)
+       +-------------------------------------+-------+---+
+                                                  ^
+                                          bits 2-1: 00=32-bit, 10=64-bit
+
+       +----------------------------------------+--+---+
+       |            address bits                |rs| 1 |  <- I/O port BAR (bit0 = 1)
+       +----------------------------------------+--+---+
+                                                   ^
+                                            bit 1: reserved
+```
+
+```c
+result.type = (barValue & 0x1) ? InputOutput : MemoryMapping;
+```
+This single bit is the fork in the road: `1` means "this device talks over classic `in`/`out` ports" (like everything you've built so far — keyboard, mouse, PCI config itself); `0` means "this device exposes a chunk of **regular memory** you access with normal pointers" (this is the "linear framebuffer" style access mentioned back when we talked about graphics cards and NICs).
+
+### Memory-mapped branch
+
+```c
+temp = barValue & ~0xF;   // clear the low 4 bits
+```
+`~0xF` = `~0000 1111` = `1111...11110000` — this masks OFF the bottom 4 bits, because those bits aren't part of the actual address at all; they're **flag bits** (type, prefetchable, 32/64-bit indicator). Only bits 4 and above are the real base address. This is the same "strip off metadata bits before using the number" idea as `registeroffset & 0xFC` from Part 2 — just a different-sized flag region.
+
+```c
+switch ((barValue >> 1) & 0x3) {
+    case 0: // 32-bit address
+    case 2: // 64-bit address
+```
+Shift right by 1 to move past the type bit, then mask with `0x3` (2 bits) to read the "address width" field. `00` = normal 32-bit address; `10` (decimal 2) = this BAR is actually the **lower half** of a 64-bit address, with the upper 32 bits stored in the *next* BAR slot (not handled here — worth knowing if you ever add 64-bit BAR support properly).
+
+```c
+result.size = 0xFFFFFFFF; // Placeholder — see note below
+```
+**Important limitation, worth flagging directly:** this isn't the device's real memory-region size — it's a placeholder. Discovering the *actual* size of a BAR's address window requires a specific dance: write all-`1`s to the BAR register, read back what "stuck" (the hardware only lets you set the bits it actually decodes), then restore the original value. That probe isn't implemented here yet — so `result.size` is currently a lie, not a real measurement. Fine as a stub for now, but any code relying on `size` being meaningful later will need this added.
+
+### I/O-port branch
+
+```c
+temp = barValue & ~0x3;   // clear only the low 2 bits
+result.prefetchable = 0;
+```
+I/O-space BARs only reserve the bottom **2** bits as flags (bit 0 = type, bit 1 = reserved) — one fewer than the memory-mapped case — so the mask is `~0x3` instead of `~0xF`. `prefetchable` (whether reads can be cached/reordered safely) is a memory-BAR-only concept, so it's just zeroed here since it doesn't apply to I/O ports at all.
+
+```c
+result.address = (uint8_t*)temp;
+```
+Either way, the cleaned-up address (whether it's really a memory pointer or really a port number in disguise) gets stored as `address`. This is why the calling code checks `bar.type` before deciding how to *use* `bar.address` — the same bit pattern means two completely different things depending on that flag.
+
+### How this gets used back in `PCI_SelectDrivers`
+
+```c
+for(uint16_t barNum = 0; barNum < 6; barNum++){
+    BaseAddressRegister bar = PCI_GetBaseAddressRegister(self, bus, device, function, barNum);
+    if (bar.address == 0 && bar.size == 0){
+        continue;
+    }
+    if(bar.address && (bar.type == InputOutput)){
+        descriptor.portBase = (uint32_t)bar.address;
+    }
+    else if(bar.address && (bar.type == MemoryMapping)){
+        // Handle memory-mapped BARs if needed
+    }
+    ...
+}
+```
+This is the payoff: for every discovered device, probe all 6 possible BAR slots, and for whichever ones are actually populated, remember **where** that device's real interface lives — `descriptor.portBase` for a port-style device (this is exactly the missing piece that would let you build a NIC driver the same way you built the keyboard/mouse ones, but with a *discovered* port number instead of a hardcoded `0x60`). The memory-mapped branch is left as a stub (`// Handle memory-mapped BARs if needed`) — worth filling in once you have a device that actually needs it (e.g. a modern NIC like the E1000 mentioned earlier, which is memory-mapped rather than port-based).
+
+### Quick BAR cheat sheet
+
+| Bit(s) | Memory-mapped BAR (bit0=0) | I/O-port BAR (bit0=1) |
+|---|---|---|
+| bit 0 | `0` = memory-mapped | `1` = I/O port |
+| bits 2-1 | address width (00=32-bit, 10=64-bit) | reserved |
+| bit 3 | prefetchable flag | — |
+| remaining bits | real base address | real base address |
+| mask to clean | `& ~0xF` | `& ~0x3` |
+
+---
+
 ## One-Sentence Summary
 
-> The command port (`0xCF8`) is a **structured request** — bus, device, function, and register all packed into specific, non-overlapping bit ranges of one 32-bit word — and the data port (`0xCFC`) hands back a whole 4-byte-aligned chunk that you then shift down to pull out the specific byte(s) you actually asked for.
+> The command port (`0xCF8`) is a **structured request** — bus, device, function, and register all packed into specific, non-overlapping bit ranges of one 32-bit word — and the data port (`0xCFC`) hands back a whole 4-byte-aligned chunk that you then shift down to pull out the specific byte(s) you actually asked for. **BARs** are the follow-up step: once you know a device exists, they tell you *where* its actual interface lives — a port number or a memory address, distinguished by a single flag bit hiding inside what otherwise looks like a plain number.
