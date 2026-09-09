@@ -100,11 +100,7 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
     InterruptManager_Activate(&im);
 
     VideoGraphicsArray_setMode(&vga, 320, 200, 8);
-    for (int32_t y=0; y<200; y++){
-        for(int32_t x=0; x < 320; x++){
-            VideoGraphicsArray_putPixel(&vga, x, y, 0x00, 0x00, 0xA8);
-        }
-    }
+    FillRectangle(&vga, 0, 0, 320, 200, 0x00, 0x00, 0xA8);
 
     while(1){
     }

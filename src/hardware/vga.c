@@ -136,9 +136,18 @@ void VideoGraphicsArray_putPixel(VideoGraphicsArray* self, uint32_t x, uint32_t 
     PutPixel(self, x, y, colorIndex);
 }
 
-uint8_t VideoGraphicsArray_getColorIndex(VideoGraphicsArray* self, uint32_t r, uint32_t g, uint32_t b){
+uint8_t VideoGraphicsArray_getColorIndex(VideoGraphicsArray* self, uint8_t r, uint8_t g, uint8_t b){
 
     if(r == 0x00 && g == 0x00 && b == 0xA8) return 0x01; // Blue
 
 }
 
+void FillRectangle(VideoGraphicsArray* self,  uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint8_t r, uint8_t g, uint8_t b){
+
+    for (int32_t Y=y; Y < y + height; Y++){
+        for(int32_t X=x; X < x + width; X++){
+            VideoGraphicsArray_putPixel(self, X, Y, r, g, b);
+        }
+    }
+
+}
