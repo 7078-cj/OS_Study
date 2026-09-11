@@ -3,6 +3,8 @@
 
 #include "common/types.h"
 #include "common/graphicscontext.h"
+#include "driver/keyboard.h"
+#include "driver/mouse.h"
 
 typedef struct Widget Widget;
 
@@ -10,6 +12,8 @@ typedef struct Widget Widget;
 typedef struct Widget
 {
     Widget* parent;
+    KeyboardDriver *keyboard;
+    MouseDriver *mouse;
     int32_t x;
     int32_t y;
     int32_t w;
@@ -23,8 +27,8 @@ typedef struct Widget
     void (*GetFocus)(void* self, Widget* widget);
     void (*ModelToScreen)(void* self, int32_t* x, int32_t* y);
     void (*Draw)(void* self, GraphicsContext* gc);
-    void (*OnMouseDown)(void* self, int32_t x, int32_t y);
-    void (*OnMouseUp)(void* self, int32_t x, int32_t y);
+    void (*OnMouseDown)(void* self, int32_t x, int32_t y, uint8_t button);
+    void (*OnMouseUp)(void* self, int32_t x, int32_t y, uint8_t button);
     void (*OnMouseMove)(void* self, int32_t old_x, int32_t old_y, int32_t new_x, int32_t new_y);
     void (*OnKeyDown)(void* self, char* str);
     void (*OnKeyUp)(void* self, char* str);
@@ -34,6 +38,8 @@ typedef struct Widget
 void Widget_init(    
     Widget *self, 
     Widget *parent, 
+    KeyboardDriver *keyboard,
+    MouseDriver *mouse,
     int32_t x,
     int32_t y,
     int32_t w,
@@ -43,13 +49,15 @@ void Widget_init(
     uint8_t b);
 void Widget_deActivate(void *self);
 
-void Widget_getFocus(void *self);
+void Widget_getFocus(void *self, Widget *widget);
 void Widget_ModelToScreen(void *self, int32_t* x, int32_t* y);
 
 void Widget_draw(void *self, GraphicsContext *gc);
 
-void Widget_onMouseDown(void *self, int32_t x, int32_t y);
-void Widget_onMouseUp(void *self, int32_t x, int32_t y);
+bool ContainsCoordinate(void *self, int32_t x, int32_t y);
+
+void Widget_onMouseDown(void *self, int32_t x, int32_t y, uint8_t button);
+void Widget_onMouseUp(void *self, int32_t x, int32_t y, uint8_t button);
 void Widget_onMouseMove(void *self, int32_t old_x, int32_t old_y, int32_t new_x, int32_t new_y);
 
 void Widget_onKeyDown(void *self, char* str);
@@ -59,6 +67,8 @@ typedef struct  CompositeWidget
 {
     /* data */
     Widget* parent;
+    KeyboardDriver *keyboard;
+    MouseDriver *mouse;
     int32_t x;
     int32_t y;
     int32_t w;
@@ -75,8 +85,8 @@ typedef struct  CompositeWidget
     void (*GetFocus)(void* self, Widget* widget);
     void (*ModelToScreen)(void* self, int32_t* x, int32_t* y);
     void (*Draw)(void* self, GraphicsContext* gc);
-    void (*OnMouseDown)(void* self, int32_t x, int32_t y);
-    void (*OnMouseUp)(void* self, int32_t x, int32_t y);
+    void (*OnMouseDown)(void* self, int32_t x, int32_t y, uint8_t button);
+    void (*OnMouseUp)(void* self, int32_t x, int32_t y, uint8_t button);
     void (*OnMouseMove)(void* self, int32_t old_x, int32_t old_y, int32_t new_x, int32_t new_y);
     void (*OnKeyDown)(void* self, char* str);
     void (*OnKeyUp)(void* self, char* str);
@@ -85,6 +95,8 @@ typedef struct  CompositeWidget
 
 void CompositeWidget_init(
     CompositeWidget *self,
+    KeyboardDriver *keyboard,
+    MouseDriver *mouse,
     Widget *parent, 
     int32_t x,
     int32_t y,
@@ -96,13 +108,14 @@ void CompositeWidget_init(
 );
 void CompositeWidget_deActivate(void *self);
 
-void CompositeWidget_getFocus(void *self);
+void CompositeWidget_getFocus(void *self, Widget *widget);
 void CompositeWidget_ModelToScreen(void *self, int32_t* x, int32_t* y);
 
 void CompositeWidget_draw(void *self, GraphicsContext *gc);
+bool CompositeWidget_addChild(void *self, Widget *child);
 
-void CompositeWidget_onMouseDown(void *self, int32_t x, int32_t y);
-void CompositeWidget_onMouseUp(void *self, int32_t x, int32_t y);
+void CompositeWidget_onMouseDown(void *self, int32_t x, int32_t y, uint8_t button);
+void CompositeWidget_onMouseUp(void *self, int32_t x, int32_t y, uint8_t button);
 void CompositeWidget_onMouseMove(void *self, int32_t old_x, int32_t old_y, int32_t new_x, int32_t new_y);
 
 void CompositeWidget_onKeyDown(void *self, char* str);

@@ -109,6 +109,7 @@ bool VideoGraphicsArray_setMode(VideoGraphicsArray* self, uint32_t width, uint32
     };
 
     VideoGraphicsArray_writeRegisters(self, g_320x200x256);
+    self->framebuffer = VideoGraphicsArray_getFrameBufferSegment(self);
     return true;
 
 }
@@ -123,11 +124,17 @@ uint8_t* VideoGraphicsArray_getFrameBufferSegment(VideoGraphicsArray* self){
         case 2: return (uint8_t*)0xB0000; 
         case 3: return (uint8_t*)0xB8000; 
     }
+
+    return 0;
 }
 
-void PutPixel(VideoGraphicsArray* self, uint32_t x, uint32_t y, uint8_t colorIndex){
-    uint8_t* pixelAddress = VideoGraphicsArray_getFrameBufferSegment(self) + (y * 320 + x);
-    *pixelAddress = colorIndex; // this will set the pixel at (x, y) to the specified color index
+void PutPixel(
+    VideoGraphicsArray* self,
+    uint32_t x,
+    uint32_t y,
+    uint8_t colorIndex
+){
+    self->framebuffer[y * 320 + x] = colorIndex;
 }
 
 
@@ -136,18 +143,48 @@ void VideoGraphicsArray_putPixel(VideoGraphicsArray* self, uint32_t x, uint32_t 
     PutPixel(self, x, y, colorIndex);
 }
 
-uint8_t VideoGraphicsArray_getColorIndex(VideoGraphicsArray* self, uint8_t r, uint8_t g, uint8_t b){
-
-    if(r == 0x00 && g == 0x00 && b == 0xA8) return 0x01; // Blue
-
-}
-
-void FillRectangle(VideoGraphicsArray* self,  uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint8_t r, uint8_t g, uint8_t b){
-
-    for (int32_t Y=y; Y < y + height; Y++){
-        for(int32_t X=x; X < x + width; X++){
-            VideoGraphicsArray_putPixel(self, X, Y, r, g, b);
-        }
+uint8_t VideoGraphicsArray_getColorIndex(
+    VideoGraphicsArray* self,
+    uint8_t r,
+    uint8_t g,
+    uint8_t b
+){
+    if(r == 0x00 && g == 0x00 && b == 0xA8){
+        return 0x01; //blue
     }
 
+    if(r == 0x00 && g == 0xA8 && b == 0x00){
+        return 0x02; // green
+    }
+
+    if(r == 0xA8 && g == 0x00 && b == 0x00){
+        return 0x04;
+    }
+
+    if(r == 0x00 && g == 0xFF && b == 0xFF){
+        return 0x3F; //white
+    }
+    
+    
+
+    return 0x00; //black
+}
+
+void FillRectangle(
+    VideoGraphicsArray* self,
+    uint32_t x,
+    uint32_t y,
+    uint32_t width,
+    uint32_t height,
+    uint8_t r,
+    uint8_t g,
+    uint8_t b
+){
+    uint8_t colorIndex = VideoGraphicsArray_getColorIndex(self, r, g, b);
+
+    for (uint32_t Y = y; Y < y + height; Y++){
+        for (uint32_t X = x; X < x + width; X++){
+            self->framebuffer[Y * 320 + X] = colorIndex;
+        }
+    }
 }

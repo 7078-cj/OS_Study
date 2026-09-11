@@ -14,6 +14,8 @@ bool ContainsCoordinate(void* self, int32_t x, int32_t y){
 void Widget_init(
     Widget *self,
     Widget *parent,
+    KeyboardDriver *keyboard,
+    MouseDriver *mouse,
     int32_t x,
     int32_t y,
     int32_t w,
@@ -46,6 +48,8 @@ void Widget_init(
 
     self->OnKeyDown     = Widget_onKeyDown;
     self->OnKeyUp       = Widget_onKeyUp;
+    self->keyboard = keyboard;
+    self->mouse = mouse;
 }
 
 
@@ -138,7 +142,8 @@ void Widget_draw(
 void Widget_onMouseDown(
     void *self,
     int32_t x,
-    int32_t y
+    int32_t y,
+    uint8_t button
 )
 {
     Widget *widget = (Widget *)self;
@@ -150,18 +155,22 @@ void Widget_onMouseDown(
             widget
         );
     }
+
+    (void)button;
 }
 
 
 void Widget_onMouseUp(
     void *self,
     int32_t x,
-    int32_t y
+    int32_t y,
+    uint8_t button
 )
 {
     (void)self;
     (void)x;
     (void)y;
+    (void)button;
 }
 
 
@@ -207,6 +216,8 @@ void Widget_onKeyUp(
 
 void CompositeWidget_init(
     CompositeWidget *self,
+    KeyboardDriver *keyboard,
+    MouseDriver *mouse,
     Widget *parent,
     int32_t x,
     int32_t y,
@@ -243,6 +254,8 @@ void CompositeWidget_init(
 
     self->OnKeyDown     = CompositeWidget_onKeyDown;
     self->OnKeyUp       = CompositeWidget_onKeyUp;
+    self->keyboard = keyboard;
+    self->mouse = mouse;
 }
 
 
@@ -328,7 +341,7 @@ void CompositeWidget_onMouseDown(
     void *self,
     int32_t x,
     int32_t y,
-    GraphicsContext *gc
+    uint8_t button
 )
 {
     CompositeWidget *composite =
@@ -337,8 +350,8 @@ void CompositeWidget_onMouseDown(
 
     for (int i = 0; i < composite->numChildren; i++)
     {
-        if(ContainsCoordinate(composite->children[i], x - composite->x, y - composite->y)){
-            composite->children[i]->OnMouseDown(composite->children[i], x - composite->x, y - composite->y);
+        if(ContainsCoordinate(&composite->children[i], x - composite->x, y - composite->y)){
+            composite->children[i]->OnMouseDown(composite->children[i], x - composite->x, y - composite->y, button);
             break;
         }
     }
@@ -348,7 +361,8 @@ void CompositeWidget_onMouseDown(
 void CompositeWidget_onMouseUp(
     void *self,
     int32_t x,
-    int32_t y
+    int32_t y,
+    uint8_t button
 )
 {
     CompositeWidget *composite =
@@ -356,8 +370,8 @@ void CompositeWidget_onMouseUp(
 
     for (int i = 0; i < composite->numChildren; i++)
     {
-        if(ContainsCoordinate(composite->children[i], x - composite->x, y - composite->y)){
-            composite->children[i]->OnMouseUp(composite->children[i], x - composite->x, y - composite->y);
+        if(ContainsCoordinate(&composite->children[i], x - composite->x, y - composite->y)){
+            composite->children[i]->OnMouseUp(composite->children[i], x - composite->x, y - composite->y, button);
             break;
         }
     }
@@ -379,7 +393,7 @@ void CompositeWidget_onMouseMove(
 
     for (int i = 0; i < composite->numChildren; i++)
     {
-        if(ContainsCoordinate(composite->children[i], old_x - composite->x, old_y - composite->y)){
+        if(ContainsCoordinate(&composite->children[i], old_x - composite->x, old_y - composite->y)){
             composite->children[i]->OnMouseMove(
                 composite->children[i], 
                 old_x - composite->x,
@@ -394,7 +408,7 @@ void CompositeWidget_onMouseMove(
 
     for (int i = 0; i < composite->numChildren; i++)
     {
-        if(ContainsCoordinate(composite->children[i], new_x - composite->x, new_x - composite->y)){
+        if(ContainsCoordinate(&composite->children[i], new_x - composite->x, new_x - composite->y)){
 
             if(firstChild != i){
                 composite->children[i]->OnMouseMove(
@@ -440,4 +454,16 @@ void CompositeWidget_onKeyUp(
     {
         composite->focussedChild->OnKeyUp(composite->focussedChild, str);
     }
+}
+
+bool CompositeWidget_addChild(void *self, Widget *child){
+
+    CompositeWidget *composite =
+        (CompositeWidget *)self;
+
+    if(composite->numChildren >= 100){
+        return false;
+    }
+    composite->children[composite->numChildren++] = child;
+    return true;
 }

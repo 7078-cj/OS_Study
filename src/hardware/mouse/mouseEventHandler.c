@@ -17,11 +17,11 @@ void MouseCursorInvert(int8_t* x, int8_t* y)
 
 void updateLocation(MouseDriver* mouse, int8_t* x, int8_t* y)
 {
-    *x += mouse->buffer[1];
+    *x += (int)mouse->buffer[1];
     if (*x < 0)   *x = 0;
     if (*x >= 80) *x = 79;
 
-    *y -= mouse->buffer[2];
+    *y -= (int)mouse->buffer[2];
     if (*y < 0)   *y = 0;
     if (*y >= 25) *y = 24;
 }

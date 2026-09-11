@@ -23,6 +23,9 @@ OBJECTS = build/loader.o \
 	build/driver.o \
 	build/pci.o \
 	build/vga.o \
+	build/widget.o \
+	build/desktop.o \
+	build/window.o
 
 # --------------------------------------------------
 # Targets
@@ -97,6 +100,27 @@ build/pci.o:	src/hardware/pci.c include/hardwarecommunication/pci.h | $(BUILD_DI
 # --------------------------------------------------
 
 build/vga.o:	src/hardware/vga.c include/driver/vga.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# WIDGET
+# --------------------------------------------------
+
+build/widget.o:	src/gui/widget.c include/gui/widget.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# DESKTOP
+# --------------------------------------------------
+
+build/desktop.o:	src/gui/desktop.c include/gui/desktop.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# --------------------------------------------------
+# WINDOW
+# --------------------------------------------------
+
+build/window.o:	src/gui/window.c include/gui/window.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # --------------------------------------------------
