@@ -4,7 +4,7 @@
 
 bool ContainsCoordinate(void* self, int32_t x, int32_t y){
     Widget *w = (Widget *)self;
-    return w->x <= x && x < w->x + w->w && w->y <= y && w->y + w->h;
+    return w->x <= x && x < w->x + w->w && w->y <= y && y < w->y + w->h;
 }
 
 /* ============================================================
@@ -319,8 +319,25 @@ void CompositeWidget_draw(
     CompositeWidget *composite =
         (CompositeWidget *)self;
 
-    Widget_draw(composite, gc);
+    int32_t X = 0;
+    int32_t Y = 0;
 
+    composite->ModelToScreen(
+        composite,
+        &X,
+        &Y
+    );
+
+    FillRectangle(
+        gc,
+        X,
+        Y,
+        composite->w,
+        composite->h,
+        composite->r,
+        composite->g,
+        composite->b
+    );
 
     for (int i = 0; i < composite->numChildren; i++)
     {
@@ -350,7 +367,7 @@ void CompositeWidget_onMouseDown(
 
     for (int i = 0; i < composite->numChildren; i++)
     {
-        if(ContainsCoordinate(&composite->children[i], x - composite->x, y - composite->y)){
+        if(ContainsCoordinate(composite->children[i], x - composite->x, y - composite->y)){
             composite->children[i]->OnMouseDown(composite->children[i], x - composite->x, y - composite->y, button);
             break;
         }
@@ -370,7 +387,7 @@ void CompositeWidget_onMouseUp(
 
     for (int i = 0; i < composite->numChildren; i++)
     {
-        if(ContainsCoordinate(&composite->children[i], x - composite->x, y - composite->y)){
+        if(ContainsCoordinate(composite->children[i], x - composite->x, y - composite->y)){
             composite->children[i]->OnMouseUp(composite->children[i], x - composite->x, y - composite->y, button);
             break;
         }
@@ -393,7 +410,7 @@ void CompositeWidget_onMouseMove(
 
     for (int i = 0; i < composite->numChildren; i++)
     {
-        if(ContainsCoordinate(&composite->children[i], old_x - composite->x, old_y - composite->y)){
+        if(ContainsCoordinate(composite->children[i], old_x - composite->x, old_y - composite->y)){
             composite->children[i]->OnMouseMove(
                 composite->children[i], 
                 old_x - composite->x,
@@ -408,7 +425,7 @@ void CompositeWidget_onMouseMove(
 
     for (int i = 0; i < composite->numChildren; i++)
     {
-        if(ContainsCoordinate(&composite->children[i], new_x - composite->x, new_x - composite->y)){
+        if(ContainsCoordinate(composite->children[i], new_x - composite->x, new_y - composite->y)){
 
             if(firstChild != i){
                 composite->children[i]->OnMouseMove(

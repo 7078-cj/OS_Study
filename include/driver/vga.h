@@ -39,7 +39,7 @@ void VideoGraphicsArray_putPixel(VideoGraphicsArray* self, uint32_t x, uint32_t 
 
 uint8_t VideoGraphicsArray_getColorIndex(VideoGraphicsArray* self, uint8_t r, uint8_t g, uint8_t b);
 
-void PutPixel(VideoGraphicsArray* self, uint32_t x, uint32_t y, uint8_t colorIndex);
+void PutPixel(VideoGraphicsArray* self, uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b);
 void FillRectangle(VideoGraphicsArray* self,  uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint8_t r, uint8_t g, uint8_t b);
 
 #endif

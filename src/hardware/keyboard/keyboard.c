@@ -1,6 +1,10 @@
 #include "driver/keyboard.h"
 #include "keyboardEventHandler.c"
 
+void KeyboardDriver_setHandler(KeyboardDriver* self, KeyboardEventHandler* handler)
+{
+    self->handler = handler;
+}
 
 
 void KeyboardDriver_init(KeyboardDriver* self, InterruptManager* im){
@@ -31,9 +35,7 @@ void KeyboardDriver_init(KeyboardDriver* self, InterruptManager* im){
     Port8Bit_Write(&self->dataport, status);
 
     Port8Bit_Write(&self->dataport, 0xF4);
-
-    
-
+    self->handler = 0;
 
 }
 

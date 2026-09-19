@@ -14,6 +14,12 @@ void MouseEventHandler_onKeyUp(
     void* self
 );
 
+typedef struct MouseEventHandler
+{
+    void (*OnMouseDown)(void* self, uint8_t button);
+    void (*OnMouseUp)(void* self, uint8_t button);
+    void (*OnMouseMove)(void* self, int8_t x, int8_t y); 
+} MouseEventHandler;
 
 typedef struct MouseDriver
 {
@@ -27,8 +33,12 @@ typedef struct MouseDriver
     uint8_t offset;
     uint8_t buttons;
 
+    MouseEventHandler* handler;
+
 
 } MouseDriver;
+
+void MouseDriver_setHandler(MouseDriver* self, MouseEventHandler* handler);
 
 void MouseDriver_init(
     MouseDriver* self,

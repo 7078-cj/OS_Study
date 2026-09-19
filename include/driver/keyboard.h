@@ -15,6 +15,11 @@ void KeyboardEventHandler_onKeyUp(
     void* self,
     uint8_t key
 );
+typedef struct KeyboardEventHandler
+{
+    void (*OnKeyDown)(void* self, char* key);
+    void (*OnKeyUp)(void* self, char* key);
+} KeyboardEventHandler;
 
 
 
@@ -28,6 +33,8 @@ typedef struct KeyboardDriver
     Port8Bit commandPort;
     uint8_t shift;
 
+    KeyboardEventHandler* handler;
+
 
 } KeyboardDriver;
 
@@ -35,6 +42,8 @@ void KeyboardDriver_init(
     KeyboardDriver* self,
     InterruptManager* im
 );
+
+void KeyboardDriver_setHandler(KeyboardDriver* self, KeyboardEventHandler* handler);
 
 void KeyboardDriver_deActivate(
     KeyboardDriver* self,

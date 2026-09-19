@@ -132,15 +132,23 @@ void PutPixel(
     VideoGraphicsArray* self,
     uint32_t x,
     uint32_t y,
-    uint8_t colorIndex
+    uint8_t r,
+    uint8_t g,
+    uint8_t b
 ){
+    if (x >= 320 || y >= 200)
+        return;
+
+    uint8_t colorIndex =
+        VideoGraphicsArray_getColorIndex(self, r, g, b);
+
     self->framebuffer[y * 320 + x] = colorIndex;
 }
 
 
 void VideoGraphicsArray_putPixel(VideoGraphicsArray* self, uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b){
-    uint8_t colorIndex = VideoGraphicsArray_getColorIndex(self, r, g, b);
-    PutPixel(self, x, y, colorIndex);
+    
+    PutPixel(self, x, y, r, g, b);
 }
 
 uint8_t VideoGraphicsArray_getColorIndex(
@@ -149,25 +157,33 @@ uint8_t VideoGraphicsArray_getColorIndex(
     uint8_t g,
     uint8_t b
 ){
-    if(r == 0x00 && g == 0x00 && b == 0xA8){
-        return 0x01; //blue
-    }
+    (void)self;
 
-    if(r == 0x00 && g == 0xA8 && b == 0x00){
-        return 0x02; // green
-    }
+    // black
+    if(r == 0x00 && g == 0x00 && b == 0x00)
+        return 0x00;
 
-    if(r == 0xA8 && g == 0x00 && b == 0x00){
+    // blue
+    if(r == 0x00 && g == 0x00 && b == 0xA8)
+        return 0x01;
+
+    // green
+    if(r == 0x00 && g == 0xA8 && b == 0x00)
+        return 0x02;
+
+    // cyan
+    if(r == 0x00 && g == 0xA8 && b == 0xA8)
+        return 0x03;
+
+    // red
+    if(r == 0xA8 && g == 0x00 && b == 0x00)
         return 0x04;
-    }
 
-    if(r == 0x00 && g == 0xFF && b == 0xFF){
-        return 0x3F; //white
-    }
-    
-    
+    // white
+    if(r == 0xFF && g == 0xFF && b == 0xFF)
+        return 0x0F;
 
-    return 0x00; //black
+    return 0x00;
 }
 
 void FillRectangle(
@@ -181,6 +197,9 @@ void FillRectangle(
     uint8_t b
 ){
     uint8_t colorIndex = VideoGraphicsArray_getColorIndex(self, r, g, b);
+
+    if (x > 320 || y > 200)
+        return;
 
     for (uint32_t Y = y; Y < y + height; Y++){
         for (uint32_t X = x; X < x + width; X++){

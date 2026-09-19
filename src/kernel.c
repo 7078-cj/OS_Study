@@ -7,6 +7,9 @@
 #include "driver/driver.h"
 #include "hardwarecommunication/pci.h"
 #include "driver/vga.h"
+#include "gui/desktop.h"
+#include "gui/widget.h"
+#include "gui/window.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
@@ -97,11 +100,24 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
 
     DriverManager_activate(&dm);
 
+
+    VideoGraphicsArray_setMode(
+        &vga,
+        320,
+        200,
+        8
+    );
+
     InterruptManager_Activate(&im);
 
-    VideoGraphicsArray_setMode(&vga, 320, 200, 8);
-    FillRectangle(&vga, 0, 0, 320, 200, 0x00, 0x00, 0xA8);
+
+    Desktop desktop;
+    Desktop_Init(&desktop, &kd, &md, 320, 200, 0x00, 0x00, 0xA8);
+
+    
+    
 
     while(1){
+        desktop.Draw(&desktop, &vga);
     }
 }

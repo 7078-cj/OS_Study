@@ -1,7 +1,10 @@
 #include "driver/mouse.h"
 #include "mouseEventHandler.c"
 
-
+void MouseDriver_setHandler(MouseDriver* self, MouseEventHandler* handler)
+{
+    self->handler = handler;
+}
 
 void MouseDriver_init(MouseDriver* self, InterruptManager* im){
 
@@ -47,20 +50,48 @@ void MouseDriver_init(MouseDriver* self, InterruptManager* im){
 
 void printf(char* str);
 
-uint32_t MouseDriver_HandleInterrupt(
-    void *self,
-    uint32_t esp
-)
+uint32_t MouseDriver_HandleInterrupt(void *self, uint32_t esp)
 {
     MouseDriver *mouse = (MouseDriver *)self;
     uint8_t status = Port8Bit_Read(&mouse->commandPort);
 
     if (!(status & 0x20))
-    {
         return esp;
-    }
 
-    MouseEventHandler_onKeyDown(mouse);
+    uint8_t data = Port8Bit_Read(&mouse->dataport);
+    mouse->buffer[mouse->offset] = data;
+    mouse->offset = (mouse->offset + 1) % 3;
+
+    if (mouse->offset != 0)
+        return esp;   // packet not complete yet
+
+    /* complete packet — notify whoever's listening, if anyone is */
+    if (mouse->handler != 0)
+    {
+        int8_t dx = (int8_t)mouse->buffer[1];
+        int8_t dy = (int8_t)mouse->buffer[2];
+
+        if (dx != 0 || dy != 0)
+            mouse->handler->OnMouseMove(mouse->handler, dx, dy);
+
+        uint8_t newButtons = mouse->buffer[0];
+        uint8_t changed = newButtons ^ mouse->buttons;
+
+        if (changed & 0x01) {
+            if (newButtons & 0x01) mouse->handler->OnMouseDown(mouse->handler, 1);
+            else                   mouse->handler->OnMouseUp(mouse->handler, 1);
+        }
+        if (changed & 0x02) {
+            if (newButtons & 0x02) mouse->handler->OnMouseDown(mouse->handler, 2);
+            else                   mouse->handler->OnMouseUp(mouse->handler, 2);
+        }
+        if (changed & 0x04) {
+            if (newButtons & 0x04) mouse->handler->OnMouseDown(mouse->handler, 3);
+            else                   mouse->handler->OnMouseUp(mouse->handler, 3);
+        }
+
+        mouse->buttons = newButtons;
+    }
 
     return esp;
 }
