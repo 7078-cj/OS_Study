@@ -6,6 +6,7 @@
 #include "driver/keyboard.h"
 #include "driver/mouse.h"
 
+
 typedef struct Widget Widget;
 
 
@@ -63,9 +64,9 @@ void Widget_onMouseMove(void *self, int32_t old_x, int32_t old_y, int32_t new_x,
 void Widget_onKeyDown(void *self, char* str);
 void Widget_onKeyUp(void *self, char* str);
 
-typedef struct  CompositeWidget
+typedef struct CompositeWidget
 {
-    /* data */
+    /* --- must match Widget exactly, same order --- */
     Widget* parent;
     KeyboardDriver *keyboard;
     MouseDriver *mouse;
@@ -78,9 +79,6 @@ typedef struct  CompositeWidget
     uint8_t g;
     uint8_t b;
     bool Focussable;
-    Widget* children[100];
-    int numChildren;
-    Widget* focussedChild;
 
     void (*GetFocus)(void* self, Widget* widget);
     void (*ModelToScreen)(void* self, int32_t* x, int32_t* y);
@@ -90,6 +88,11 @@ typedef struct  CompositeWidget
     void (*OnMouseMove)(void* self, int32_t old_x, int32_t old_y, int32_t new_x, int32_t new_y);
     void (*OnKeyDown)(void* self, char* str);
     void (*OnKeyUp)(void* self, char* str);
+
+    /* --- composite-only fields go last --- */
+    Widget* children[100];
+    int numChildren;
+    Widget* focussedChild;
 
 } CompositeWidget;
 
@@ -120,7 +123,7 @@ void CompositeWidget_onMouseMove(void *self, int32_t old_x, int32_t old_y, int32
 
 void CompositeWidget_onKeyDown(void *self, char* str);
 void CompositeWidget_onKeyUp(void *self, char* str);
-
+int CompositeWidget_childAt(CompositeWidget *c, int32_t x, int32_t y);
 
 
 #endif

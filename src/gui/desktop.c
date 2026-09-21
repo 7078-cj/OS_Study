@@ -1,4 +1,5 @@
 #include "gui/desktop.h"
+#include "gui/window.h"
 
 void Desktop_Init(Desktop *self, KeyboardDriver *keyboard, MouseDriver *mouse, int32_t w, int32_t h, uint8_t r, uint8_t g, uint8_t b)
 {
@@ -8,6 +9,7 @@ void Desktop_Init(Desktop *self, KeyboardDriver *keyboard, MouseDriver *mouse, i
 
     self->MouseX = w / 2;
     self->MouseY = h / 2;
+    self->needsRedraw = true;
 
     self->Draw          = Desktop_draw;
     self->OnMouseDown    = Desktop_onMouseDown;
@@ -65,38 +67,18 @@ void Desktop_onMouseUp(void *self, int32_t x, int32_t y, uint8_t button){
     desktop->compositeWidget.OnMouseUp(&desktop->compositeWidget,x, y, button);
 }
 
-void OnMouseMove(void *self, int x, int y){
-    Desktop *desktop =
-        (Desktop *)self;
-
-    x /= 4;
-    y /= 4;
-    
-    int32_t newMouseX = desktop->MouseX + x;
-    if(newMouseX < 0) newMouseX = 0;
-    if(newMouseX >= desktop->compositeWidget.w) newMouseX =  desktop->compositeWidget.w -1;
-
-    int32_t newMouseY = desktop->MouseY + y;
-    if(newMouseY < 0) newMouseY = 0;
-    if(newMouseY >= desktop->compositeWidget.h) newMouseY =  desktop->compositeWidget.h -1;
-
-    desktop->compositeWidget.OnMouseMove(&desktop->compositeWidget, desktop->MouseX, desktop->MouseY, newMouseX, newMouseY);
-
-    desktop->MouseX = newMouseX;
-    desktop->MouseY = newMouseY;
-
-}
-
 void Desktop_MouseDownEvent(void* self, uint8_t button)
 {
     Desktop* desktop = (Desktop*)self;
     desktop->OnMouseDown(desktop, desktop->MouseX, desktop->MouseY, button);
+    desktop->needsRedraw = true;
 }
 
 void Desktop_MouseUpEvent(void* self, uint8_t button)
 {
     Desktop* desktop = (Desktop*)self;
     desktop->OnMouseUp(desktop, desktop->MouseX, desktop->MouseY, button);
+    desktop->needsRedraw = true;
 }
 
 void Desktop_MouseMoveEvent(void* self, int8_t x, int8_t y)
@@ -115,22 +97,26 @@ void Desktop_MouseMoveEvent(void* self, int8_t x, int8_t y)
 
     desktop->MouseX = newMouseX;
     desktop->MouseY = newMouseY;
+    desktop->needsRedraw = true;
 }
 
 void Desktop_onMouseMove(void *self, int32_t old_x, int32_t old_y, int32_t new_x, int32_t new_y)
 {
     Desktop *desktop = (Desktop *)self;
     desktop->compositeWidget.OnMouseMove(&desktop->compositeWidget, old_x, old_y, new_x, new_y);
+    
 }
 
 void Desktop_KeyDownEvent(void* self, char* key)
 {
     Desktop* desktop = (Desktop*)self;
     desktop->compositeWidget.OnKeyDown(&desktop->compositeWidget, key);
+    desktop->needsRedraw = true;
 }
 
 void Desktop_KeyUpEvent(void* self, char* key)
 {
     Desktop* desktop = (Desktop*)self;
     desktop->compositeWidget.OnKeyUp(&desktop->compositeWidget, key);
+    desktop->needsRedraw = true;
 }

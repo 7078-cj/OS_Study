@@ -2,6 +2,8 @@
 #include "common/graphicscontext.h"
 #include "driver/vga.h"
 
+
+
 bool ContainsCoordinate(void* self, int32_t x, int32_t y){
     Widget *w = (Widget *)self;
     return w->x <= x && x < w->x + w->w && w->y <= y && y < w->y + w->h;
@@ -354,92 +356,56 @@ void CompositeWidget_draw(
 
 
 
-void CompositeWidget_onMouseDown(
-    void *self,
-    int32_t x,
-    int32_t y,
-    uint8_t button
-)
+void CompositeWidget_onMouseDown(void *self, int32_t x, int32_t y, uint8_t button)
 {
-    CompositeWidget *composite =
-        (CompositeWidget *)self;
+    CompositeWidget *composite = (CompositeWidget *)self;
 
+    int32_t lx = x - composite->x;
+    int32_t ly = y - composite->y;
 
-    for (int i = 0; i < composite->numChildren; i++)
-    {
-        if(ContainsCoordinate(composite->children[i], x - composite->x, y - composite->y)){
-            composite->children[i]->OnMouseDown(composite->children[i], x - composite->x, y - composite->y, button);
-            break;
-        }
-    }
+    int i = CompositeWidget_childAt(composite, lx, ly);
+    if (i < 0)
+        return;
+
+    Widget *child = composite->children[i];
+
+    /* shift the windows above it down one slot, then put it last (= on top) */
+    for (int j = i; j < composite->numChildren - 1; j++)
+        composite->children[j] = composite->children[j + 1];
+    composite->children[composite->numChildren - 1] = child;
+
+    composite->focussedChild = child;    // keyboard input now goes to this window
+
+    child->OnMouseDown(child, lx, ly, button);
 }
 
 
-void CompositeWidget_onMouseUp(
-    void *self,
-    int32_t x,
-    int32_t y,
-    uint8_t button
-)
+void CompositeWidget_onMouseUp(void *self, int32_t x, int32_t y, uint8_t button)
 {
-    CompositeWidget *composite =
-        (CompositeWidget *)self;
+    CompositeWidget *composite = (CompositeWidget *)self;
+    int32_t lx = x - composite->x;
+    int32_t ly = y - composite->y;
 
-    for (int i = 0; i < composite->numChildren; i++)
-    {
-        if(ContainsCoordinate(composite->children[i], x - composite->x, y - composite->y)){
-            composite->children[i]->OnMouseUp(composite->children[i], x - composite->x, y - composite->y, button);
-            break;
-        }
-    }
+    int i = CompositeWidget_childAt(composite, lx, ly);
+    if (i >= 0)
+        composite->children[i]->OnMouseUp(composite->children[i], lx, ly, button);
 }
 
 
-void CompositeWidget_onMouseMove(
-    void *self,
-    int32_t old_x,
-    int32_t old_y,
-    int32_t new_x,
-    int32_t new_y
-)
+void CompositeWidget_onMouseMove(void *self, int32_t old_x, int32_t old_y, int32_t new_x, int32_t new_y)
 {
-    CompositeWidget *composite =
-        (CompositeWidget *)self;
+    CompositeWidget *composite = (CompositeWidget *)self;
 
-    int firstChild = -1;
+    int32_t ox = old_x - composite->x, oy = old_y - composite->y;
+    int32_t nx = new_x - composite->x, ny = new_y - composite->y;
 
-    for (int i = 0; i < composite->numChildren; i++)
-    {
-        if(ContainsCoordinate(composite->children[i], old_x - composite->x, old_y - composite->y)){
-            composite->children[i]->OnMouseMove(
-                composite->children[i], 
-                old_x - composite->x,
-                old_y - composite->y, 
-                new_x - composite->x, 
-                new_y - composite->y
-            );
-            firstChild = i;
-            break;
-        }
-    }
+    int first = CompositeWidget_childAt(composite, ox, oy);
+    if (first >= 0)
+        composite->children[first]->OnMouseMove(composite->children[first], ox, oy, nx, ny);
 
-    for (int i = 0; i < composite->numChildren; i++)
-    {
-        if(ContainsCoordinate(composite->children[i], new_x - composite->x, new_y - composite->y)){
-
-            if(firstChild != i){
-                composite->children[i]->OnMouseMove(
-                    composite->children[i], 
-                    old_x - composite->x,
-                    old_y - composite->y, 
-                    new_x - composite->x, 
-                    new_y - composite->y
-                );
-            }
-            
-            break;
-        }
-    }
+    int second = CompositeWidget_childAt(composite, nx, ny);
+    if (second >= 0 && second != first)
+        composite->children[second]->OnMouseMove(composite->children[second], ox, oy, nx, ny);
 }
 
 
@@ -483,4 +449,14 @@ bool CompositeWidget_addChild(void *self, Widget *child){
     }
     composite->children[composite->numChildren++] = child;
     return true;
+}
+
+int CompositeWidget_childAt(CompositeWidget *c, int32_t x, int32_t y)
+{
+    for (int i = c->numChildren - 1; i >= 0; i--)      // top to bottom
+    {
+        if (c->children[i] != 0 && ContainsCoordinate(c->children[i], x, y))
+            return i;
+    }
+    return -1;
 }

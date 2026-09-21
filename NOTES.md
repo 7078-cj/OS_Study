@@ -1060,3 +1060,241 @@ This is the payoff: for every discovered device, probe all 6 possible BAR slots,
 ## One-Sentence Summary
 
 > The command port (`0xCF8`) is a **structured request** — bus, device, function, and register all packed into specific, non-overlapping bit ranges of one 32-bit word — and the data port (`0xCFC`) hands back a whole 4-byte-aligned chunk that you then shift down to pull out the specific byte(s) you actually asked for. **BARs** are the follow-up step: once you know a device exists, they tell you *where* its actual interface lives — a port number or a memory address, distinguished by a single flag bit hiding inside what otherwise looks like a plain number.
+
+# MyOS GUI Notes: Widget / CompositeWidget Bugs
+
+Four mistakes caused the crash and garbage screen. The first one was the real killer.
+
+---
+
+## 1. Structs you cast between must have the same layout (main bug)
+
+The code treats a `CompositeWidget` as a `Widget` everywhere, for example `children[i]->Draw(...)`. C does not check this. It just reads the field at the offset where `Widget` says `Draw` lives.
+
+```
+Widget (what the code THINKS it is)      CompositeWidget (what it REALLY was)
+------------------------------------     ------------------------------------
+parent ... Focussable                    parent ... Focussable
+GetFocus       <-- slot A                children[0]   <-- slot A
+ModelToScreen  <-- slot B                children[1]   <-- slot B
+Draw           <-- slot C                children[2]   <-- slot C  (empty = 0)
+```
+
+The code read "Draw" from slot C, found `children[2]` (empty), and jumped to address 0. That is a crash. The blue background was the last thing painted before it.
+
+**Rule:** if you cast `A*` to `B*`, the shared fields must be identical and in the same order. Extra fields go at the end.
+
+Safer still: embed the base struct as the first member so a mismatch cannot happen.
+
+```c
+typedef struct CompositeWidget {
+    Widget base;            // must be first
+    Widget* children[100];
+    int numChildren;
+    Widget* focussedChild;
+} CompositeWidget;
+```
+
+Add compile-time checks so the compiler catches drift:
+
+```c
+#include <stddef.h>
+
+_Static_assert(offsetof(CompositeWidget, parent)        == offsetof(Widget, parent),        "layout");
+_Static_assert(offsetof(CompositeWidget, x)             == offsetof(Widget, x),             "layout");
+_Static_assert(offsetof(CompositeWidget, GetFocus)      == offsetof(Widget, GetFocus),      "layout");
+_Static_assert(offsetof(CompositeWidget, ModelToScreen) == offsetof(Widget, ModelToScreen), "layout");
+_Static_assert(offsetof(CompositeWidget, Draw)          == offsetof(Widget, Draw),          "layout");
+_Static_assert(offsetof(CompositeWidget, OnMouseDown)   == offsetof(Widget, OnMouseDown),   "layout");
+```
+
+---
+
+## 2. Set overrides on the object the caller actually reads
+
+The old `Window_Init` set `self->Draw = ...` on the `Window`. But the parent only ever sees `&win.compositeWidget`, so it reads the function pointers inside that struct. The overrides sat on a different object and never ran.
+
+**Rule:** set function pointers on the struct you hand to the parent.
+
+```c
+self->compositeWidget.OnMouseDown = Window_onMouseDown;
+self->compositeWidget.OnMouseUp   = Window_onMouseUp;
+self->compositeWidget.OnMouseMove = Window_onMouseMove;
+```
+
+---
+
+## 3. An override must call the base function directly, never through the pointer
+
+```c
+// BAD: the pointer now points at this same function, so it calls itself forever
+void Window_onMouseDown(void *self, int32_t x, int32_t y, uint8_t button) {
+    Window *window = (Window *)self;
+    window->compositeWidget.OnMouseDown(&window->compositeWidget, x, y, button);
+}
+
+// GOOD: call the base implementation by name
+void Window_onMouseDown(void *self, int32_t x, int32_t y, uint8_t button) {
+    Window *window = (Window *)self;
+    window->dragging = (button == 1);
+    CompositeWidget_onMouseDown(&window->compositeWidget, x, y, button);
+}
+```
+
+Think of it as `super.method()` in other languages. Here you spell out the base function yourself, because the pointer no longer leads there.
+
+Infinite recursion overflows the stack. In a kernel that means garbage on screen or a reboot instead of a friendly error. That is the striped screen you saw.
+
+---
+
+## 4. Pass the address of the thing you mean
+
+```c
+CompositeWidget_addChild(&desktop, ...);                    // wrong type, only works by luck
+CompositeWidget_addChild(&desktop.compositeWidget, ...);    // correct
+```
+
+The compiler did not complain because of a cast to `void*` or `Widget*`. If you need a cast to make it compile, stop and check that it is the right pointer.
+
+---
+
+## Debugging tips
+
+- A crash right after the first paint usually means a bad function pointer or bad struct layout, not bad drawing code.
+- Draw one widget by calling its function directly, for example `CompositeWidget_draw(&win1.compositeWidget, &vga)`. If that works and the normal path does not, the bug is in the dispatch (pointers or layout).
+- Anything that passes through `void*` or a cast has no compiler protection. Add `_Static_assert` checks for those.
+
+---
+
+## Checklist before adding a new widget type
+
+- [ ] Does the base struct come first (or is the shared prefix identical)?
+- [ ] Are overrides set on the embedded struct the parent will hold?
+- [ ] Do overrides call `Base_function(...)` by name, not `->Pointer(...)`?
+- [ ] Am I passing `&thing.embedded`, not `&thing`, wherever the base type is expected?
+- [ ] Do the `_Static_assert` layout checks still pass?
+
+---
+
+## Still open (not bugs today, but they will bite later)
+
+- Drawing puts the last child on top, but mouse hit-testing picks the first match. Overlapping windows will click the wrong one.
+- The cursor draws up to 3 pixels past the screen edge unless `PutPixel` clips.
+- The `while(1)` loop repaints everything constantly. Add a dirty flag or a back buffer if you see flicker.
+
+# What `flip` Does (Back Buffer, Simply Explained)
+
+## The one-sentence version
+
+`flip` copies a finished picture from normal memory (RAM) to the screen's memory, all at once.
+
+---
+
+## The problem it solves
+
+Without a back buffer, every draw call writes **directly to the screen**:
+
+```
+Draw background  -> screen shows blue        <- you can SEE this
+Draw window 1    -> screen shows red square  <- and this
+Draw window 2    -> screen shows green square
+Draw cursor      -> screen shows cursor
+```
+
+The monitor refreshes about 60 times a second. If it refreshes in the middle of your drawing, it shows a half-finished frame: a blue screen with no windows for a moment. Repeat that on every mouse move and you see **flicker**.
+
+---
+
+## The fix: draw backstage, then show the audience
+
+Think of a theater. You don't build the set while the audience is watching. You build it behind the curtain, then open the curtain.
+
+```
+  RAM (backstage)                      Screen (audience)
+  +----------------+                   +----------------+
+  |  backBuffer    |   --- flip --->   |  0xA0000       |
+  |  (64,000 bytes)|                   |  (video memory)|
+  +----------------+                   +----------------+
+   all drawing goes here                shows only finished frames
+```
+
+1. `PutPixel` and `FillRectangle` write into `backBuffer` (RAM). Nothing changes on screen.
+2. When the whole frame is done, `flip` copies the buffer to video memory.
+3. The screen jumps from one complete frame to the next. No half-drawn frames, so no flicker.
+
+---
+
+## Why 64,000 bytes?
+
+The screen is 320 x 200 pixels, and each pixel is 1 byte (one colour index in 256-colour mode).
+
+```
+320 x 200 = 64,000 bytes
+```
+
+---
+
+## The code
+
+```c
+void VideoGraphicsArray_flip(VideoGraphicsArray* self)
+{
+    void *dst = self->screen;          // video memory (0xA0000)
+    const void *src = self->framebuffer; // the back buffer in RAM
+    uint32_t count = (320 * 200) / 4;  // 16,000 chunks of 4 bytes
+
+    __asm__ volatile (
+        "cld; rep movsl"
+        : "+D"(dst), "+S"(src), "+c"(count)
+        :
+        : "memory"
+    );
+}
+```
+
+Line by line:
+
+- `dst` is where to copy **to** (the screen), `src` is where to copy **from** (the back buffer).
+- `count` is how many times to copy. It copies 4 bytes at a time, so 64,000 / 4 = 16,000 times.
+- `rep movsl` is a single CPU instruction that repeats "copy 4 bytes" `count` times. It is very fast.
+- `cld` makes the copy go forward (low address to high address).
+- Assembly is used because a kernel has no `memcpy`. The compiler can turn a normal copy loop into a `memcpy` call and then fail to link.
+
+---
+
+## How the pieces connect
+
+```c
+// In setMode:
+self->screen      = 0xA0000;      // real video memory, only used by flip
+self->framebuffer = backBuffer;   // where PutPixel / FillRectangle write
+
+// In the main loop:
+if (desktop.needsRedraw) {
+    desktop.needsRedraw = false;
+    desktop.Draw(&desktop, &vga);   // draw into RAM
+    VideoGraphicsArray_flip(&vga);  // show it
+}
+```
+
+Because `PutPixel` and `FillRectangle` only use `self->framebuffer`, the widget code did not need to change.
+
+---
+
+## Common mistakes
+
+| Mistake | What you see |
+|---|---|
+| Forgot to call `flip` | Black screen (you drew, but never showed it) |
+| `screen` never set | Black screen or a crash |
+| Back buffer is a local variable | Stack overflow (64 KB is too big for the stack), so make it global or `static` |
+| `FillRectangle` does not clip the right and bottom edges | Writes past the end of the buffer and corrupts other variables |
+| `flip` called inside `Desktop_draw` | Works, but mixes widget code with display code. Keep it in the main loop |
+
+---
+
+## Remember
+
+- **Draw calls** change RAM.
+- **`flip`** changes the screen.
+- Call `flip` **once per frame**, after everything is drawn.

@@ -1,6 +1,8 @@
 #include "driver/vga.h"
 #include "driver/driver.h"
 
+uint8_t backBuffer[320 * 200];
+
 void VideoGraphicsArray_init(VideoGraphicsArray* self){
     Port8Bit_init(&self->miscPort, 0x3C2);
     Port8Bit_init(&self->crtcIndexPort, 0x3D4);
@@ -109,7 +111,8 @@ bool VideoGraphicsArray_setMode(VideoGraphicsArray* self, uint32_t width, uint32
     };
 
     VideoGraphicsArray_writeRegisters(self, g_320x200x256);
-    self->framebuffer = VideoGraphicsArray_getFrameBufferSegment(self);
+    self->screen      = VideoGraphicsArray_getFrameBufferSegment(self);  // 0xA0000
+    self->framebuffer = backBuffer;                                      // draw into RAM
     return true;
 
 }
@@ -188,22 +191,37 @@ uint8_t VideoGraphicsArray_getColorIndex(
 
 void FillRectangle(
     VideoGraphicsArray* self,
-    uint32_t x,
-    uint32_t y,
-    uint32_t width,
-    uint32_t height,
-    uint8_t r,
-    uint8_t g,
-    uint8_t b
+    uint32_t x, uint32_t y,
+    uint32_t width, uint32_t height,
+    uint8_t r, uint8_t g, uint8_t b
 ){
     uint8_t colorIndex = VideoGraphicsArray_getColorIndex(self, r, g, b);
 
-    if (x > 320 || y > 200)
+    if (x >= 320 || y >= 200)
         return;
 
-    for (uint32_t Y = y; Y < y + height; Y++){
-        for (uint32_t X = x; X < x + width; X++){
+    uint32_t xEnd = x + width;
+    uint32_t yEnd = y + height;
+    if (xEnd > 320) xEnd = 320;      // clip right edge
+    if (yEnd > 200) yEnd = 200;      // clip bottom edge
+
+    for (uint32_t Y = y; Y < yEnd; Y++){
+        for (uint32_t X = x; X < xEnd; X++){
             self->framebuffer[Y * 320 + X] = colorIndex;
         }
     }
+}
+
+void VideoGraphicsArray_flip(VideoGraphicsArray* self)
+{
+    void *dst = self->screen;
+    const void *src = self->framebuffer;
+    uint32_t count = (320 * 200) / 4;      /* 16000 dwords */
+
+    __asm__ volatile (
+        "cld; rep movsl"
+        : "+D"(dst), "+S"(src), "+c"(count)
+        :
+        : "memory"
+    );
 }

@@ -15,6 +15,7 @@ uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
 uint8_t CursorX = 0;
 uint8_t CursorY = 0;
+bool needsRedraw = true;  
 
 void printf(char* str)
 {
@@ -114,10 +115,24 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
     Desktop desktop;
     Desktop_Init(&desktop, &kd, &md, 320, 200, 0x00, 0x00, 0xA8);
 
+    Window win1;
+    Window win2;
     
+    Window_Init(&win1, &kd, &md, &desktop.compositeWidget, 10, 10, 20, 20, 0xA8, 0x00, 0x00);
+    Window_Init(&win2, &kd, &md, &desktop.compositeWidget, 40, 15, 30, 30, 0x00, 0xA8, 0x00);
+
+    
+    CompositeWidget_addChild(&desktop.compositeWidget, (Widget *)&win1.compositeWidget);
+    CompositeWidget_addChild(&desktop.compositeWidget, (Widget *)&win2.compositeWidget);
     
 
-    while(1){
-        desktop.Draw(&desktop, &vga);
+    while (1) {
+        if (desktop.needsRedraw) {
+            desktop.needsRedraw = false;
+            desktop.Draw(&desktop, &vga);         // draws into RAM
+            VideoGraphicsArray_flip(&vga);        // one copy to the screen
+        } else {
+            __asm__ volatile("hlt");
+        }
     }
 }

@@ -21,8 +21,11 @@ typedef struct VideoGraphicsArray {
     Port8Bit attributeControllerResetPort;
 
     uint8_t* framebuffer;
+    uint8_t* screen;
 
 } VideoGraphicsArray;
+
+void VideoGraphicsArray_flip(VideoGraphicsArray* self);
 
 void VideoGraphicsArray_init(VideoGraphicsArray* self);
 void VideoGraphicsArray_deActivate(VideoGraphicsArray* self);
