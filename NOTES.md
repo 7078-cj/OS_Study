@@ -1298,3 +1298,394 @@ Because `PutPixel` and `FillRectangle` only use `self->framebuffer`, the widget 
 - **Draw calls** change RAM.
 - **`flip`** changes the screen.
 - Call `flip` **once per frame**, after everything is drawn.
+
+Here is a clean Markdown note you can save in your OS development notes:
+
+````md
+# Recovering a Parent Struct from a Field Pointer in C
+
+## The Pattern
+
+```c
+Desktop *desktop =
+    (Desktop*)((char*)self - offsetof(Desktop, keyboardEventHandler));
+````
+
+This works by using **pointer arithmetic** to recover the address of the containing `Desktop` structure from the address of one of its fields.
+
+---
+
+## Example Structure
+
+Suppose we have:
+
+```c
+typedef struct {
+    Widget widget;
+    KeyboardEventHandler keyboardEventHandler;
+    MouseEventHandler mouseEventHandler;
+} Desktop;
+```
+
+And a callback receives:
+
+```c
+void *self
+```
+
+where `self` actually points to:
+
+```c
+&desktop->keyboardEventHandler
+```
+
+---
+
+## 1. `self` Points to a Field
+
+Conceptually, memory looks like:
+
+```text
+Desktop
++-----------------------------+
+| widget                      |  offset 0
++-----------------------------+
+| keyboardEventHandler        |  offset 100
++-----------------------------+
+| mouseEventHandler           |  offset 120
++-----------------------------+
+```
+
+If:
+
+```c
+self == &desktop->keyboardEventHandler;
+```
+
+then `self` points to the field at offset `100` from the beginning of `Desktop`.
+
+---
+
+## 2. Get the Field's Offset
+
+```c
+offsetof(Desktop, keyboardEventHandler)
+```
+
+returns the number of **bytes** between the beginning of `Desktop` and `keyboardEventHandler`.
+
+For example:
+
+```text
+offsetof(Desktop, keyboardEventHandler) = 100
+```
+
+So:
+
+```text
+Desktop address
+      |
+      | +100 bytes
+      v
+keyboardEventHandler
+      ^
+      |
+     self
+```
+
+---
+
+## 3. Convert `self` to `char *`
+
+```c
+(char*)self
+```
+
+This is important because pointer arithmetic on `char *` operates in **bytes**.
+
+Therefore:
+
+```c
+(char*)self - 100
+```
+
+means:
+
+> Move 100 bytes backward from `keyboardEventHandler`.
+
+That takes us back to the beginning of the `Desktop` structure.
+
+---
+
+## 4. Cast Back to `Desktop *`
+
+The complete expression is:
+
+```c
+(Desktop*)((char*)self - offsetof(Desktop, keyboardEventHandler))
+```
+
+This performs:
+
+```text
+address of field
+       |
+       | subtract field offset
+       v
+address of containing struct
+       |
+       | cast
+       v
+Desktop *
+```
+
+So we can write:
+
+```c
+Desktop *desktop =
+    (Desktop*)((char*)self - offsetof(Desktop, keyboardEventHandler));
+```
+
+Now `desktop` points to the original `Desktop` object.
+
+---
+
+## Visual Representation
+
+```text
+                 Desktop
+                    |
+                    v
++----------------------------------+
+| widget                           |
+|                                  |
+|                                  |
++----------------------------------+
+| keyboardEventHandler             | <--- self
++----------------------------------+
+| mouseEventHandler                |
++----------------------------------+
+
+        ^                 |
+        |                 |
+        | subtract       |
+        | offset         |
+        |                 |
+        +-----------------+
+
+                ↓
+
+        Desktop's address
+```
+
+---
+
+## Why `char *`?
+
+Pointer arithmetic depends on the size of the pointed-to type.
+
+For example:
+
+```c
+int *p;
+p - 1;
+```
+
+moves backward by:
+
+```text
+sizeof(int)
+```
+
+bytes.
+
+But:
+
+```c
+char *p;
+p - 1;
+```
+
+moves backward by:
+
+```text
+1 byte
+```
+
+Therefore, converting to `char *` allows us to subtract an exact number of bytes:
+
+```c
+(char*)self - offsetof(Desktop, keyboardEventHandler)
+```
+
+---
+
+## Why This Works
+
+The calculation is based on:
+
+```text
+address of field
+=
+address of struct
++
+offset of field
+```
+
+Therefore:
+
+```text
+address of struct
+=
+address of field
+-
+offset of field
+```
+
+In C:
+
+```c
+Desktop *desktop =
+    (Desktop*)((char*)self - offsetof(Desktop, keyboardEventHandler));
+```
+
+---
+
+## Example Callback
+
+This is useful when an event system passes a pointer to a specific event handler, but the callback needs access to the entire parent object.
+
+```c
+void Desktop_onKeyDown(void *self, char *str)
+{
+    Desktop *desktop =
+        (Desktop*)((char*)self -
+                   offsetof(Desktop, keyboardEventHandler));
+
+    /* Now we can access the Desktop */
+    desktop->widget;
+    desktop->keyboardEventHandler;
+}
+```
+
+The important assumption is:
+
+```c
+self == &desktop->keyboardEventHandler
+```
+
+If `self` does not actually point to that field, the calculation will produce an invalid pointer.
+
+---
+
+## Relation to `container_of`
+
+This technique is commonly known as the **container-of pattern**.
+
+Conceptually:
+
+```text
+field pointer
+     ↓
+subtract field offset
+     ↓
+containing structure
+```
+
+The Linux kernel uses this general technique extensively.
+
+---
+
+## Special Case: First Field
+
+If the field is the first member of the structure:
+
+```c
+typedef struct {
+    KeyboardEventHandler keyboardEventHandler;
+    Widget widget;
+} Desktop;
+```
+
+then:
+
+```c
+offsetof(Desktop, keyboardEventHandler)
+```
+
+will normally be `0`.
+
+Therefore:
+
+```c
+Desktop *desktop = (Desktop*)self;
+```
+
+can work because the address of the first member is the same as the address of the structure.
+
+---
+
+## Important Rule
+
+This:
+
+```c
+Desktop *desktop =
+    (Desktop*)((char*)self - offsetof(Desktop, keyboardEventHandler));
+```
+
+is safe only when:
+
+```c
+self == &desktop->keyboardEventHandler
+```
+
+In other words:
+
+> You must know which structure contains the field that `self` points to.
+
+You cannot arbitrarily cast an unrelated pointer and expect it to become the correct parent structure.
+
+---
+
+## Why This Is Useful in MyOS
+
+In the GUI/event system, a callback may receive only:
+
+```c
+void *self
+```
+
+or a pointer to an event handler.
+
+Using the container-of technique lets the callback recover its parent object:
+
+```text
+Keyboard event
+      |
+      v
+keyboardEventHandler
+      |
+      | recover parent
+      v
+Desktop
+      |
+      +--> Widget
+      +--> keyboard state
+      +--> mouse state
+      +--> other Desktop fields
+```
+
+This is especially useful when implementing:
+
+* `Desktop`
+* `Widget`
+* `CompositeWidget`
+* `TextBox`
+* keyboard callbacks
+* mouse callbacks
+* event handlers
+* parent/child GUI relationships
+
+```
+```
