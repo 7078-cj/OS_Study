@@ -1,6 +1,8 @@
 #include "gui/desktop.h"
 #include "gui/window.h"
 
+
+
 void Desktop_Init(Desktop *self, KeyboardDriver *keyboard, MouseDriver *mouse, int32_t w, int32_t h, uint8_t r, uint8_t g, uint8_t b)
 {
     self->keyboard = keyboard;
@@ -16,6 +18,9 @@ void Desktop_Init(Desktop *self, KeyboardDriver *keyboard, MouseDriver *mouse, i
     self->OnMouseUp      = Desktop_onMouseUp;
     self->OnMouseMove    = Desktop_onMouseMove;
 
+    self->OnKeyDown = &Desktop_KeyDown;
+    self->OnKeyUp   = &Desktop_KeyUp;
+
     /* implement the mouse-driver-facing interface */
     self->mouseEventHandler.OnMouseDown = &Desktop_MouseDownEvent;
     self->mouseEventHandler.OnMouseUp   = &Desktop_MouseUpEvent;
@@ -23,7 +28,7 @@ void Desktop_Init(Desktop *self, KeyboardDriver *keyboard, MouseDriver *mouse, i
     MouseDriver_setHandler(mouse, &self->mouseEventHandler);
 
     self->keyboardEventHandler.OnKeyDown = &Desktop_KeyDownEvent;   
-    self->keyboardEventHandler.OnKeyUp   = &Desktop_KeyUpEvent;    
+    self->keyboardEventHandler.OnKeyUp   = &Desktop_KeyUpEvent;   
     KeyboardDriver_setHandler(keyboard, &self->keyboardEventHandler);
 }
 
@@ -107,16 +112,30 @@ void Desktop_onMouseMove(void *self, int32_t old_x, int32_t old_y, int32_t new_x
     
 }
 
-void Desktop_KeyDownEvent(void* self, char* key)
+void Desktop_KeyDown(void* self, char* key)
 {
     Desktop* desktop = (Desktop*)self;
     desktop->compositeWidget.OnKeyDown(&desktop->compositeWidget, key);
     desktop->needsRedraw = true;
 }
 
-void Desktop_KeyUpEvent(void* self, char* key)
+void Desktop_KeyUp(void* self, char* key)
 {
     Desktop* desktop = (Desktop*)self;
     desktop->compositeWidget.OnKeyUp(&desktop->compositeWidget, key);
     desktop->needsRedraw = true;
+}
+
+void Desktop_KeyDownEvent(void* self, char* key)
+{
+    Desktop* desktop =
+    (Desktop*)((char*)self - offsetof(Desktop, keyboardEventHandler));
+    desktop->OnKeyDown(desktop, key);
+}
+
+void Desktop_KeyUpEvent(void* self, char* key)
+{
+    Desktop* desktop =
+    (Desktop*)((char*)self - offsetof(Desktop, keyboardEventHandler));
+    desktop->OnKeyUp(desktop, key);
 }

@@ -10,6 +10,7 @@
 #include "gui/desktop.h"
 #include "gui/widget.h"
 #include "gui/window.h"
+#include "gui/textbox.h"
 
 uint16_t* VideoMemory = (uint16_t*)0xb8000;
 
@@ -118,10 +119,13 @@ void kernelMain(void* multiboot_structure, unsigned int magic_number){
     Window win1;
     Window win2;
     
-    Window_Init(&win1, &kd, &md, &desktop.compositeWidget, 10, 10, 20, 20, 0xA8, 0x00, 0x00);
+    Window_Init(&win1, &kd, &md, &desktop.compositeWidget, 10, 10, 150, 60, 0xA8, 0x00, 0x00);
     Window_Init(&win2, &kd, &md, &desktop.compositeWidget, 40, 15, 30, 30, 0x00, 0xA8, 0x00);
 
-    
+    TextBox input;
+    TextBox_Init(&input, (Widget *)&win1.compositeWidget, &kd, &md, 5, 20, 140, 12);
+
+    CompositeWidget_addChild(&win1.compositeWidget, &input.widget);    
     CompositeWidget_addChild(&desktop.compositeWidget, (Widget *)&win1.compositeWidget);
     CompositeWidget_addChild(&desktop.compositeWidget, (Widget *)&win2.compositeWidget);
     

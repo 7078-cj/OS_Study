@@ -25,8 +25,8 @@ OBJECTS = build/loader.o \
 	build/vga.o \
 	build/widget.o \
 	build/desktop.o \
-	build/window.o
-
+	build/window.o \
+	build/textbox.o
 # --------------------------------------------------
 # Targets
 # --------------------------------------------------
@@ -121,26 +121,31 @@ build/desktop.o:	src/gui/desktop.c include/gui/desktop.h | $(BUILD_DIR)
 # --------------------------------------------------
 
 build/window.o:	src/gui/window.c include/gui/window.h | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@ 
+# --------------------------------------------------
+# Textbox
+# --------------------------------------------------
+
+build/textbox.o:	src/gui/textbox.c include/gui/textbox.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@ 
 
 # --------------------------------------------------
 # Interrupts
 # --------------------------------------------------
 
-build/interrupts.o: src/interrupts/interrupts.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+build/interrupts.o:	src/interrupts/interrupts.c include/hardwarecommunication/interrupts.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@ 
 
-build/interruptstub.o: src/interrupts/interruptstubs.s | $(BUILD_DIR)
-	as $(ASFLAGS) -o $@ $<
-
-
-# --------------------------------------------------
+	
 # Assembly
 # --------------------------------------------------
 
 build/loader.o: src/loader.s | $(BUILD_DIR)
 	as $(ASFLAGS) -o $@ $<
 
+
+build/interruptstub.o: src/interrupts/interruptstubs.s | $(BUILD_DIR)
+	as $(ASFLAGS) -o $@ $<
 # --------------------------------------------------
 # Link kernel
 # --------------------------------------------------

@@ -27,7 +27,6 @@ void backspace()
 
 void onKeyDown(KeyboardDriver* keyboard, char* key)
 {
-    printf(key);
 
     if (keyboard->handler != 0)
     {
@@ -162,7 +161,7 @@ void KeyboardEventHandler_onKeyDown(void* self, uint8_t key){
 
             /* Special */
             case 0x01: onKeyDown(keyboard, "ESC"); break;
-            case 0x0E: backspace(); break;
+            case 0x0E: onKeyDown(keyboard, "\b"); break;
             case 0x0F: onKeyDown(keyboard, "TAB"); break;
             case 0x1C: onKeyDown(keyboard, "ENTER"); break;
             case 0x39: onKeyDown(keyboard, " "); break;

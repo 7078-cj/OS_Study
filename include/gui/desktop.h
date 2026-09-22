@@ -2,6 +2,8 @@
 #define __DESKTOP_H  
 
 #include "gui/widget.h"
+#include "driver/keyboard.h"
+#include "driver/mouse.h"
 
 typedef struct Desktop
 {
@@ -22,6 +24,8 @@ typedef struct Desktop
     void (*OnMouseDown)(void* self, int32_t x, int32_t y, uint8_t button);
     void (*OnMouseUp)(void* self, int32_t x, int32_t y, uint8_t button);
     void (*OnMouseMove)(void* self, int32_t old_x, int32_t old_y, int32_t new_x, int32_t new_y);
+    void (*OnKeyUp)(void* self, char* key);
+    void (*OnKeyDown)(void* self, char* key);
 
 } Desktop;
 
@@ -44,6 +48,9 @@ void Desktop_onMouseMove(void *self, int32_t old_x, int32_t old_y, int32_t new_x
 void Desktop_MouseMoveEvent(void* self, int8_t x, int8_t y);
 void Desktop_MouseUpEvent(void* self, uint8_t button);
 void Desktop_MouseDownEvent(void* self, uint8_t button);
+
+void Desktop_KeyDown(void* self, char* key);
+void Desktop_KeyUp(void* self, char* key);
 
 void Desktop_KeyDownEvent(void* self, char* key);
 void Desktop_KeyUpEvent(void* self, char* key);

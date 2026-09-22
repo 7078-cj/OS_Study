@@ -3,10 +3,9 @@
 
 #include "common/types.h"
 #include "common/graphicscontext.h"
-#include "driver/keyboard.h"
-#include "driver/mouse.h"
 
-
+typedef struct KeyboardDriver KeyboardDriver;
+typedef struct MouseDriver MouseDriver;
 typedef struct Widget Widget;
 
 

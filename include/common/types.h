@@ -15,4 +15,7 @@ typedef unsigned long long uint64_t;
 
 typedef enum { false, true } bool;
 
+#define offsetof(type, member) \
+    ((uint32_t)&(((type*)0)->member))
+
 #endif
